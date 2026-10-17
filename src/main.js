@@ -5,6 +5,7 @@ import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
 import { loadRace } from './data/source.js';
 import { renderProfile, createCharts } from './charts.js';
 import { deriveEvents } from './events.js';
+import mediaData from '../data/media.json';
 
 const $ = id => document.getElementById(id);
 const app = $('app');
@@ -54,6 +55,10 @@ async function boot() {
 
   const summit = route.reduce((best, p) => p[2] > best[2] ? p : best);
   const events = deriveEvents(riders, { summitD: summit[3] });
+  // Media moments (data/media.json): a clip filmed where a rider passed road point d, timed by that rider.
+  const moments = mediaData.map(m => ({ ...m, rider: riders.findIndex(r => r.id === m.riderId) }))
+    .filter(m => m.rider >= 0)
+    .map(m => ({ ...m, t: timeAtDistance(riders[m.rider].samples, m.d) }));
 
   const initial = parseState(location.search, { riderIds: riders.map(r => r.id), duration });
   let time = initial.t, speed = initial.speed, playing = false, finishedShown = false;
@@ -88,24 +93,26 @@ async function boot() {
     lead: '<path d="M4 18.5h16M5 15.5 3.5 7l5 3.5L12 4l3.5 6.5 5-3.5-1.5 8.5z"/>',
     summit: '<path d="M2.5 20 9.5 8l4 6.5 2.5-3.5 5.5 9z"/>',
     finish: '<path d="M6 21V3.5M6 4h11.5l-2.5 4.25 2.5 4.25H6"/>',
+    media: '<rect x="3" y="7" width="12.5" height="10" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3z"/>',
   };
-  for (const e of events) {
+  for (const e of [...events, ...moments.map(m => ({ t: m.t, type: 'media' }))]) {
     const tick = document.createElement('i');
     tick.className = e.type;
     tick.style.left = (e.t / duration * 100).toFixed(2) + '%';
     $('ticks').append(tick);
   }
-  const eventItems = events.map(e => {
+  const listed = [...events, ...moments.map(m => ({ t: m.t, type: 'media', rider: m.rider, text: m.caption, moment: m }))].sort((a, b) => a.t - b.t);
+  const eventItems = listed.map(e => {
     const li = document.createElement('li'), r = riders[e.rider];
     li.innerHTML = `<button style="--c:${r.color}" data-t="${e.t}"><time>${formatClock(e.t)}</time><svg viewBox="0 0 24 24" aria-hidden="true">${EVENT_ICONS[e.type]}</svg><span></span></button>`;
     li.querySelector('span').textContent = e.text;
-    li.querySelector('button').addEventListener('click', () => jumpTo(e));
+    li.querySelector('button').addEventListener('click', () => e.moment ? openMoment(e.moment) : jumpTo(e));
     $('events-list').append(li);
     return li;
   });
   const eventsBox = $('events'), eventsBtn = $('events-btn');
   function openEvents() {
-    eventItems.forEach((li, k) => li.classList.toggle('past', events[k].t < time));
+    eventItems.forEach((li, k) => li.classList.toggle('past', listed[k].t < time));
     eventsBox.hidden = false;
     eventsBtn.setAttribute('aria-expanded', 'true');
     const card = $('events-card');
@@ -129,6 +136,53 @@ async function boot() {
     setPlaying(true);
   }
   eventsBtn.addEventListener('click', () => eventsBox.hidden ? openEvents() : closeEvents());
+
+  // ---- media moments: a muted picture-in-picture as the rider passes, a full-screen clip on tap ----
+  const pip = $('pip'), pipVideo = pip.querySelector('video'), clip = $('clip'), clipVideo = clip.querySelector('video');
+  let pipMoment = null, resumeAfterClip = false;
+  function showPip(m) {
+    pipMoment = m;
+    pipVideo.src = m.src; pipVideo.poster = m.poster ?? '';
+    pip.hidden = false;
+    requestAnimationFrame(() => pip.classList.add('in'));
+    pipVideo.play().catch(() => hidePip());
+  }
+  function hidePip() {
+    if (pip.hidden) return;
+    pip.classList.remove('in');
+    pipVideo.pause();
+    setTimeout(() => { if (!pip.classList.contains('in')) pip.hidden = true; }, 400);
+  }
+  pipVideo.addEventListener('ended', hidePip);
+  pip.addEventListener('click', () => pipMoment && openMoment(pipMoment));
+  // Seek to the moment, follow its rider, and play the clip full screen; the race waits behind it.
+  function openMoment(m) {
+    closeEvents();
+    hidePip();
+    followRider(m.rider);
+    seek(m.t);
+    resumeAfterClip = playing;
+    setPlaying(false);
+    clipVideo.src = m.src; clipVideo.poster = m.poster ?? '';
+    clipVideo.muted = true;
+    clip.querySelector('.clip-cap').textContent = m.caption;
+    clip.classList.remove('sound');
+    clip.hidden = false;
+    if (!reducedMotion) clipVideo.play().catch(() => {});
+  }
+  function closeClip() {
+    clip.hidden = true;
+    clipVideo.pause();
+    if (resumeAfterClip) setPlaying(true);
+  }
+  // Tap the clip: sound on (and play again once it has ended).
+  clipVideo.addEventListener('click', () => {
+    clipVideo.muted = false;
+    clip.classList.add('sound');
+    if (clipVideo.paused) clipVideo.play().catch(() => {});
+  });
+  $('clip-close').addEventListener('click', closeClip);
+  clip.addEventListener('click', e => { if (e.target === clip) closeClip(); });
   eventsBox.addEventListener('click', e => { if (e.target === eventsBox) closeEvents(); });
 
   // ---- 3D world ------------------------------------------------------------
@@ -184,6 +238,7 @@ async function boot() {
   }
   function seek(t) {
     time = Math.max(0, Math.min(duration, t));
+    if (pipMoment && Math.abs(time - pipMoment.t) > 120) hidePip();
     if (time < duration) finishedShown = false;
     updateUi(true);
     pushState();
@@ -207,6 +262,7 @@ async function boot() {
   $('replay').addEventListener('click', () => { $('podium').hidden = true; setPlaying(true); });
   $('podium-close').addEventListener('click', () => { $('podium').hidden = true; });
   addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !clip.hidden) return closeClip();
     if (e.key === 'Escape' && !eventsBox.hidden) return closeEvents();
     if (e.target.closest('input,select,textarea') && e.key !== ' ') return;
     if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
@@ -361,6 +417,8 @@ async function boot() {
       time = Math.min(duration, time + dt * speed);
       const crossed = events.findLast(e => e.t > from && e.t <= time);
       if (crossed) toast(crossed.text, 2500);
+      const met = moments.findLast(m => m.t > from && m.t <= time);
+      if (met && !reducedMotion && clip.hidden) showPip(met);
       if (time >= duration) {
         setPlaying(false);
         if (!finishedShown) { finishedShown = true; showPodium(); }
@@ -389,6 +447,7 @@ async function boot() {
   }
 
   // ---- go ------------------------------------------------------------------------------------
+  for (const m of moments) world?.addPin({ d: m.d, label: `Video: ${m.caption}`, onClick: () => live && openMoment(m) });
   live = true;
   select(selected);
   syncCams();

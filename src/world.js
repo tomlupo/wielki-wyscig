@@ -320,6 +320,18 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     const el = document.createElement('div'); el.className = 'mark'; el.textContent = text; labels.append(el);
     return { el, p: roadPoint(d, new THREE.Vector3(), 40) };
   });
+  // Media moments: a small camera pin standing on the road where a clip was filmed.
+  const pins = [];
+  function addPin({ d, label, onClick }) {
+    const el = document.createElement('button');
+    el.className = 'pin';
+    el.setAttribute('aria-label', label);
+    el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="12.5" height="10" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3z"/></svg>';
+    el.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+    labels.append(el);
+    pins.push({ el, p: roadPoint(d, new THREE.Vector3(), 3) });
+    lastKey = '';
+  }
 
   await breathe();
   // ---- camera rig ----------------------------------------------------------
@@ -600,6 +612,12 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       m.el.hidden = !visible;
       if (visible) m.el.style.transform = `translate3d(${(project.x * 0.5 + 0.5) * w}px,${(-project.y * 0.5 + 0.5) * h}px,0)`;
     }
+    for (const m of pins) {
+      project.copy(m.p).project(camera);
+      const visible = project.z < 1 && Math.abs(project.x) < 0.95 && Math.abs(project.y) < 0.95 && camera.position.distanceTo(m.p) < 4500;
+      m.el.hidden = !visible;
+      if (visible) m.el.style.transform = `translate3d(${(project.x * 0.5 + 0.5) * w}px,${(-project.y * 0.5 + 0.5) * h}px,0)`;
+    }
 
     // Render on demand: a paused, settled view costs nothing.
     const key = `${camera.position.x.toFixed(2)},${camera.position.y.toFixed(2)},${camera.position.z.toFixed(2)},${camLook.x.toFixed(2)},${camLook.z.toFixed(2)},${time},${rig.selected},${w},${h},${dpr}`;
@@ -612,7 +630,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   textureReady.then(() => { lastKey = ''; });
 
   return {
-    frame, setMode, startIntro, skipIntro,
+    frame, setMode, startIntro, skipIntro, addPin,
     // Ready once imagery is decoded and shaders are compiled (in parallel where the GPU allows).
     ready: textureReady.then(() => renderer.extensions.has('KHR_parallel_shader_compile') && renderer.compileAsync(scene, camera)).catch(() => {}),
     get introRunning() { return !!rig.intro; },

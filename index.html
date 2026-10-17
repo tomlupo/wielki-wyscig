@@ -89,6 +89,12 @@
     <div class="events-card" id="events-card"><h2 class="sec">Race events</h2><ol id="events-list"></ol></div>
   </div>
 
+  <button class="pip" id="pip" aria-label="Watch the clip" hidden><video muted playsinline preload="none"></video></button>
+  <div class="clip" id="clip" role="dialog" aria-label="Video" hidden>
+    <figure><video playsinline preload="auto"></video><figcaption><span class="clip-cap"></span><small>Tap for sound</small></figcaption></figure>
+    <button class="clip-close" id="clip-close" aria-label="Close video"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+
   <div class="loader" id="loader" role="status">
     <div class="loader-inner">
       <span class="kicker">Wielki Wyścig</span>

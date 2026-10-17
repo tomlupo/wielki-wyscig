@@ -362,7 +362,8 @@ async function boot() {
   let snap = 'peek', sheetY = 0, dragStart = null;
   function snapHeights() {
     const top = sheet.getBoundingClientRect().top - sheetY;
-    const peek = $('standings-title').getBoundingClientRect().top - sheetY - top;
+    // Peek shows the player bar only: it ends under the scrubber, above the sheet's own bottom padding.
+    const peek = sheet.querySelector('.scrub-wrap').getBoundingClientRect().bottom - sheetY - top + parseFloat(getComputedStyle(sheet).paddingBottom);
     const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
     return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }

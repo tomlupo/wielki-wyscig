@@ -98,8 +98,8 @@ svg { display: block; }
 .fnav svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- camera buttons ----------------------------------------------------------- */
-.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 196px); display: flex; flex-direction: column; gap: 8px; }
-.cams button { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); position: relative; transition: background 0.2s, color 0.2s, transform 0.15s; }
+.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 202px); display: flex; flex-direction: column; gap: 6px; }
+.cams button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); position: relative; transition: background 0.2s, color 0.2s, transform 0.15s; }
 .cams button:active { transform: scale(0.94); }
 .cams svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .cams span { display: none; }
@@ -138,7 +138,7 @@ svg { display: block; }
 .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--rider) 40%, transparent), 0 2px 8px rgba(0, 0, 0, 0.5); }
 .scrub::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--rider) 40%, transparent); }
 
-.profile { flex: none; margin: 2px -4px 0; }
+.profile { flex: none; margin: 16px -4px 0; }
 .profile svg { width: 100%; height: 76px; overflow: visible; touch-action: none; }
 .p-area { opacity: 0.55; }
 .p-line { fill: none; stroke: rgba(255, 255, 255, 0.75); stroke-width: 1.4; }
@@ -287,7 +287,14 @@ svg { display: block; }
 }
 @media (max-height: 640px) and (max-width: 959px) {
   .focus .stats { display: none; }
-  .cams { top: calc(var(--safe-t) + 136px); }
+  .cams { top: calc(var(--safe-t) + 142px); }
+}
+/* Landscape phones: no height for a column, so the rail is a row on the right, just above the sheet. */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 959px) {
+  .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
+  .cams button { width: 40px; height: 40px; border-radius: 12px; }
+  .cams svg { width: 20px; height: 20px; }
+  .tv-cap { max-width: calc(100% - 2 * var(--gutter) - 240px); }
 }
 
 /* ---- desktop ------------------------------------------------------------------------- */

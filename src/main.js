@@ -4,6 +4,7 @@ import { elevationProfile, climbStats, gradeAt, gradeColor } from './profile.js'
 import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
 import { loadRace } from './data/source.js';
 import { renderProfile, createCharts } from './charts.js';
+import { deriveEvents } from './events.js';
 
 const $ = id => document.getElementById(id);
 const app = $('app');
@@ -51,6 +52,9 @@ async function boot() {
   const stats = climbStats(route), profile = elevationProfile(route);
   const distanceAt = (i, t) => interpolate(riders[i].samples, t, 'd');
 
+  const summit = route.reduce((best, p) => p[2] > best[2] ? p : best);
+  const events = deriveEvents(riders, { summitD: summit[3] });
+
   const initial = parseState(location.search, { riderIds: riders.map(r => r.id), duration });
   let time = initial.t, speed = initial.speed, playing = false, finishedShown = false;
   let selected = Math.max(0, riders.findIndex(r => r.id === initial.rider));
@@ -77,6 +81,55 @@ async function boot() {
     board.append(li);
     return { li, rank: li.querySelector('.rank'), gap: li.querySelector('.gap'), sens: li.querySelector('.sens'), prog: li.querySelector('.prog i'), btn: li.querySelector('button') };
   });
+
+  // ---- race events: ticks on the scrubber and a list behind one button ------
+  const EVENT_ICONS = {
+    pass: '<path d="M5 6.5 10.5 12 5 17.5M12.5 6.5 18 12l-5.5 5.5"/>',
+    lead: '<path d="M4 18.5h16M5 15.5 3.5 7l5 3.5L12 4l3.5 6.5 5-3.5-1.5 8.5z"/>',
+    summit: '<path d="M2.5 20 9.5 8l4 6.5 2.5-3.5 5.5 9z"/>',
+    finish: '<path d="M6 21V3.5M6 4h11.5l-2.5 4.25 2.5 4.25H6"/>',
+  };
+  for (const e of events) {
+    const tick = document.createElement('i');
+    tick.className = e.type;
+    tick.style.left = (e.t / duration * 100).toFixed(2) + '%';
+    $('ticks').append(tick);
+  }
+  const eventItems = events.map(e => {
+    const li = document.createElement('li'), r = riders[e.rider];
+    li.innerHTML = `<button style="--c:${r.color}" data-t="${e.t}"><time>${formatClock(e.t)}</time><svg viewBox="0 0 24 24" aria-hidden="true">${EVENT_ICONS[e.type]}</svg><span></span></button>`;
+    li.querySelector('span').textContent = e.text;
+    li.querySelector('button').addEventListener('click', () => jumpTo(e));
+    $('events-list').append(li);
+    return li;
+  });
+  const eventsBox = $('events'), eventsBtn = $('events-btn');
+  function openEvents() {
+    eventItems.forEach((li, k) => li.classList.toggle('past', events[k].t < time));
+    eventsBox.hidden = false;
+    eventsBtn.setAttribute('aria-expanded', 'true');
+    const card = $('events-card');
+    if (desktop.matches) { // a popover under the button, inside the panel
+      const b = eventsBtn.getBoundingClientRect();
+      card.style.top = `${b.bottom + 8}px`;
+      card.style.right = `${innerWidth - sheet.getBoundingClientRect().right + 18}px`;
+    } else card.style.top = card.style.right = '';
+    (eventItems.find(li => !li.classList.contains('past')) ?? eventItems.at(-1))?.scrollIntoView({ block: 'nearest' });
+  }
+  function closeEvents() {
+    eventsBox.hidden = true;
+    eventsBtn.setAttribute('aria-expanded', 'false');
+  }
+  // Start a little before the move (about two seconds of playback at the current speed), on the rider who made it.
+  function jumpTo(e) {
+    closeEvents();
+    followRider(e.rider);
+    seek(e.t - Math.min(60, Math.max(5, 2 * speed)));
+    pushState(true);
+    setPlaying(true);
+  }
+  eventsBtn.addEventListener('click', () => eventsBox.hidden ? openEvents() : closeEvents());
+  eventsBox.addEventListener('click', e => { if (e.target === eventsBox) closeEvents(); });
 
   // ---- 3D world ------------------------------------------------------------
   // Callbacks from the world can fire while it is still loading; they wait until the HUD is wired (`live`).
@@ -154,6 +207,7 @@ async function boot() {
   $('replay').addEventListener('click', () => { $('podium').hidden = true; setPlaying(true); });
   $('podium-close').addEventListener('click', () => { $('podium').hidden = true; });
   addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !eventsBox.hidden) return closeEvents();
     if (e.target.closest('input,select,textarea') && e.key !== ' ') return;
     if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === 'ArrowRight') seek(time + 15);
@@ -303,7 +357,10 @@ async function boot() {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (playing) {
+      const from = time;
       time = Math.min(duration, time + dt * speed);
+      const crossed = events.findLast(e => e.t > from && e.t <= time);
+      if (crossed) toast(crossed.text, 2500);
       if (time >= duration) {
         setPlaying(false);
         if (!finishedShown) { finishedShown = true; showPodium(); }
@@ -350,10 +407,10 @@ async function boot() {
 }
 
 let toastTimer = 0;
-function toast(message) {
+function toast(message, ms = 2600) {
   const el = $('toast');
   el.textContent = message;
   el.classList.add('in');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('in'), 2600);
+  toastTimer = setTimeout(() => el.classList.remove('in'), ms);
 }

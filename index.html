@@ -53,9 +53,10 @@
       <button id="play" class="play" aria-label="Play"><svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.5v15l12.5-7.5z"/></svg><svg viewBox="0 0 24 24" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg></button>
       <div class="clock"><output id="clock">0:00</output><span id="duration"></span></div>
       <button id="speed" class="chip" aria-label="Replay speed">30×</button>
+      <button id="events-btn" class="chip icon" aria-label="Race events" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M6 21V3.5M6 4h11.5l-2.5 4.25 2.5 4.25H6"/></svg></button>
       <button id="share" class="chip icon" aria-label="Share this moment"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v8h14v-8"/></svg></button>
     </div>
-    <input id="scrub" class="scrub" type="range" min="0" max="1" step="1" value="0" aria-label="Race clock">
+    <div class="scrub-wrap"><div class="ticks" id="ticks" aria-hidden="true"></div><input id="scrub" class="scrub" type="range" min="0" max="1" step="1" value="0" aria-label="Race clock"></div>
     <div class="profile"><svg id="profile" role="img" aria-label="Elevation profile with rider positions. Tap to jump the selected rider to that point."></svg></div>
     <h2 class="sec" id="standings-title">Standings</h2>
     <ol class="board" id="board"></ol>
@@ -82,6 +83,10 @@
       <ol id="podium-list"></ol>
       <div class="podium-actions"><button id="replay" class="primary">Replay</button><button id="podium-close">Close</button></div>
     </div>
+  </div>
+
+  <div class="events" id="events" role="dialog" aria-label="Race events" hidden>
+    <div class="events-card" id="events-card"><h2 class="sec">Race events</h2><ol id="events-list"></ol></div>
   </div>
 
   <div class="loader" id="loader" role="status">

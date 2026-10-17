@@ -33,6 +33,28 @@ The reference road is `public/terrain.json` → `route`, whose entries are `[eas
 
 Private repository visibility does not itself protect a deployed app. Existing Vercel Deployment Protection remains in place. Review access deliberately before adding personal activity data.
 
+## Data sources (the one seam)
+
+`src/data/source.js` is the only place the app learns where race data comes from. A **RaceSource** is `{ load(): Promise<RaceV1> }`. `loadRace(source)` validates the result against the contract above. Everything after that point (the race model, the 3D world, the HUD, the URL state) only sees version-1 data.
+
+- **Today:** `simulatedSource()` → `GET /api/race` → `data/race.json` (synthetic riders).
+- **GPX / FIT files:** write `gpxSource(files)` that returns a RaceV1. For each rider:
+  1. Parse the track points.
+  2. Project lat/lon into the terrain frame.
+  3. Map-match each point to the nearest `route` vertex to get `d`.
+  4. Trim to the segment, so that `d` runs from 0 to `distanceM`.
+  5. Rebase `t` to 0 at the segment start.
+  6. Keep `watts` and `hr` from the extensions. Use `null` when they are absent.
+
+  The terrain `bounds` are projected metres (UTM, EPSG:25831), and `route` x/z are east/south metres from the terrain centre. Validate that projection against the source GPX before you trust it.
+- **Live per-rider feed:** write a source whose `load()` returns the current snapshot. To get updates, add `subscribe(onRace)`, and rebuild the race model on each update. Live riders have not reached the summit yet, so `validateRace` needs a `live` flag that relaxes the "ends at `distanceM`" rule. This flag does not exist yet.
+
+Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSource(...))`).
+
+## URL state
+
+`?t=<seconds>&r=<rider id>&cam=<follow|pov|overview|free>&x=<speed>` opens the replay at that moment and skips the intro (`src/state.js`). The Share button copies this link.
+
 ## Development
 
 `npm ci`, `npm test`, `npm run dev`, `npm run build`.

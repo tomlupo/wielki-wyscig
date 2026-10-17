@@ -1,61 +1,359 @@
-import * as THREE from 'three';
-import * as d3 from 'd3';
 import './style.css';
-import {validateRace,interpolate,timeAtDistance,telemetryAt} from './race.js';
-(async()=>{
-const root=document.getElementById('batalla-world'),$=s=>root.querySelector('#'+s);
-try{
-const [terrainResponse,raceResponse]=await Promise.all([fetch('/terrain.json'),fetch('/api/race')]);
-if(!terrainResponse.ok||!raceResponse.ok)throw Error('Could not load terrain or race data. Please reload.');
-const D=await terrainResponse.json(),race=validateRace(await raceResponse.json());
-if(typeof THREE==='undefined')throw Error('The 3D engine could not load. Please reopen this view with an internet connection.');
-const T=THREE,world=$('bw-world'),scene=new T.Scene();
-const camera=new T.PerspectiveCamera(45,1,1,24000);let renderer,webgl=true,fallbackImage=null,fallbackContext;
-try { renderer=new T.WebGLRenderer({antialias:true,alpha:false}); }
-catch { webgl=false;const canvas=document.createElement('canvas');fallbackContext=canvas.getContext('2d');if(!fallbackContext)throw Error('This browser cannot display the race map.');renderer={domElement:canvas,capabilities:{getMaxAnisotropy:()=>1},setPixelRatio(){},setSize(w,h){canvas.width=w;canvas.height=h},render(){drawFallback()}};root.querySelectorAll('[data-camera="chase"],[data-camera="ride"]').forEach(b=>{b.disabled=true;b.setAttribute('title','3D camera requires WebGL')});root.querySelector('[data-camera="overview"]').textContent='Aerial map';root.querySelector('.bw-location').textContent='2D fallback · WebGL unavailable · select a rider to follow'; }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;world.prepend(renderer.domElement);renderer.domElement.setAttribute('aria-label','Satellite-textured 3D mountain and rider replay');renderer.domElement.setAttribute('role','img');
-const sky=new T.Color(0xc8d7d5);scene.background=sky;scene.fog=new T.Fog(sky,9000,20000);scene.add(new T.HemisphereLight(0xffffff,0x6b735b,2.0));const sun=new T.DirectionalLight(0xfff5df,1.8);sun.position.set(-3500,7000,4000);scene.add(sun);
-const bytes=Uint8Array.from(atob(D.heights),c=>c.charCodeAt(0)),heights=new Uint16Array(bytes.buffer);const {nx,ny,width,depth}=D;
-function elevation(x,z){const u=Math.max(0,Math.min(nx-1.001,(x/width+.5)*(nx-1))),v=Math.max(0,Math.min(ny-1.001,(z/depth+.5)*(ny-1))),a=Math.floor(u),b=Math.floor(v),fx=u-a,fy=v-b;return (heights[b*nx+a]*(1-fx)*(1-fy)+heights[b*nx+a+1]*fx*(1-fy)+heights[(b+1)*nx+a]*(1-fx)*fy+heights[(b+1)*nx+a+1]*fx*fy)/10}
-const geom=new T.PlaneGeometry(width,depth,nx-1,ny-1);geom.rotateX(-Math.PI/2);for(let i=0;i<heights.length;i++)geom.attributes.position.setY(i,heights[i]/10);geom.computeVertexNormals();
-const mat=new T.MeshStandardMaterial({roughness:1,metalness:0,color:0xffffff});const ground=new T.Mesh(geom,mat);scene.add(ground);new T.TextureLoader().load(D.texture,texture=>{texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());mat.map=texture;mat.needsUpdate=true;fallbackImage=texture.image;$('bw-loading').style.display='none'},undefined,()=>{$('bw-loading').textContent='Aerial imagery could not load.'});
-// A terrain skirt makes the finite survey area explicit at distant camera angles.
-const edge=[];for(let i=0;i<nx;i++)edge.push(i);for(let j=1;j<ny;j++)edge.push(j*nx+nx-1);for(let i=nx-2;i>=0;i--)edge.push((ny-1)*nx+i);for(let j=ny-2;j>0;j--)edge.push(j*nx);const sp=[],si=[];edge.forEach((id,i)=>{const p=geom.attributes.position;sp.push(p.getX(id),p.getY(id),p.getZ(id),p.getX(id),40,p.getZ(id));let k=i*2,n=((i+1)%edge.length)*2;si.push(k,n,k+1,n,n+1,k+1)});const sg=new T.BufferGeometry();sg.setAttribute('position',new T.Float32BufferAttribute(sp,3));sg.setIndex(si);sg.computeVertexNormals();scene.add(new T.Mesh(sg,new T.MeshStandardMaterial({color:0x61604d,roughness:1,side:T.DoubleSide})));
-const road=D.route,len=road.at(-1)[3],ends=race.riders.map(r=>r.samples.at(-1).t),names=race.riders.map(r=>r.name),colors=race.riders.map(r=>parseInt(r.color.slice(1),16));if(Math.abs(race.distanceM-len)>1)throw Error('Race distance does not match this climb.');const escapeHtml=v=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const cssColors=colors.map(c=>'#'+c.toString(16).padStart(6,'0'));
-const fmt=s=>Math.floor(Math.max(s,0)/60)+':'+String(Math.floor(Math.max(s,0)%60)).padStart(2,'0');
-function roadAt(d){d=Math.max(0,Math.min(len,d));let l=0,r=road.length-1;while(r-l>1){let m=(l+r)>>1;if(road[m][3]<d)l=m;else r=m}let a=road[l],b=road[r],f=(d-a[3])/(b[3]-a[3]);return a.map((v,j)=>v+(b[j]-v)*f)}
-function point(d,lift=7){let p=roadAt(d);return new T.Vector3(p[0],elevation(p[0],p[1])+lift,p[1])}
-const roadPoints=[];for(let d=0;d<len;d+=7)roadPoints.push(point(d));roadPoints.push(point(len));class RoadCurve extends T.Curve{getPoint(t,target=new T.Vector3()){let a=t*(roadPoints.length-1),i=Math.min(roadPoints.length-2,Math.floor(a));return target.copy(roadPoints[i]).lerp(roadPoints[i+1],a-i)}}
-const curve=new RoadCurve();scene.add(new T.Mesh(new T.TubeGeometry(curve,roadPoints.length,4.5,5,false),new T.MeshBasicMaterial({color:0xf7e7a7,transparent:true,opacity:.9})));const line=new T.Line(new T.BufferGeometry().setFromPoints(roadPoints),new T.LineBasicMaterial({color:0xffffff}));scene.add(line);
-function marker(text,color){const c=document.createElement('canvas');c.width=128;c.height=128;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.beginPath();ctx.arc(64,55,40,0,Math.PI*2);ctx.fill();ctx.fillStyle='#15231c';ctx.textAlign='center';ctx.font='500 43px system-ui';ctx.fillText(text,64,70);const tx=new T.CanvasTexture(c);tx.colorSpace=T.SRGBColorSpace;return new T.Sprite(new T.SpriteMaterial({map:tx,depthTest:false,transparent:true}))}
-const riders=ends.map((finish,i)=>{const pin=marker(String.fromCharCode(65+i),cssColors[i]);scene.add(pin);return {finish,name:names[i],pin,samples:[]}});
-riders.forEach((r,i)=>{r.samples=race.riders[i].samples});
-function distanceAt(i,t){return interpolate(riders[i].samples,t,'d')}
-function timeAt(i,d){return timeAtDistance(riders[i].samples,d)}
-function sensor(i,t){return telemetryAt(riders[i].samples,t)}
-const duration=Math.max(...ends);
-$('bw-time').max=duration;
-root.querySelector('.bw-head > .bw-sub').textContent=riders.length+' RIDERS · '+(race.simulated?'SIMULATED RACE':'RECORDED RACE');
-if(!race.simulated)root.querySelector('.bw-caption').innerHTML=root.querySelector('.bw-caption').innerHTML.replace('All rider telemetry simulated.','Recorded rider telemetry. Missing sensor values are shown as unavailable.');
-let time=Math.min(1080,duration),selected=0,playing=false,mode='overview',radius=6000,theta=.35,phi=.95,focus=new T.Vector3(0,350,0),last=0,lastUI=0;const pointer=new T.Vector2(),ray=new T.Raycaster(),pointers=new Map();let oldPinch=0,touchTap=0;
-const endpointLabels=[];for(let [d,text] of [[0,'CAIMARI · 200 m'],[len,'COLL DE SA BATALLA · 577 m']]){let el=document.createElement('div');el.className='bw-label';el.textContent=text;world.append(el);endpointLabels.push({el,p:point(d,70)});let pin=marker(d?'F':'S','#ffffff');pin.position.copy(point(d,15));pin.scale.setScalar(80);scene.add(pin)}
-riders.forEach((r,i)=>{const el=document.createElement('button');el.className='bw-rider';el.setAttribute('aria-pressed',i===selected);el.setAttribute('aria-label','Select rider '+String.fromCharCode(65+i)+' '+r.name);el.innerHTML=`<div class="bw-row"><span><span class="bw-chip" style="background:${cssColors[i]}"></span>${String.fromCharCode(65+i)}<span class="bw-name"> ${escapeHtml(r.name)}</span></span></div><div class="bw-gap"></div><small class="bw-sensors"></small><small>${fmt(r.finish)} finish</small><div class="bw-progress"><div class="bw-progress-fill" style="background:${cssColors[i]}"></div></div>`;el.onclick=()=>{selected=i;root.style.setProperty('--rider-color',cssColors[i]);if(!webgl&&mode==='free')focus.copy(point(distanceAt(i,time)));updateUI();charts()};$('bw-riders').append(el);r.el=el});
-function setMode(m){mode=m;root.querySelectorAll('[data-camera]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.camera===m));if(m==='overview'){focus.set(0,350,0);radius=6000;theta=.35;phi=.95}if(m==='free'){let p=point(distanceAt(selected,time));focus.copy(p);radius=1700;phi=.8}updateUI()}
-root.querySelectorAll('[data-camera]').forEach(b=>b.onclick=()=>setMode(b.dataset.camera));$('bw-expand').onclick=()=>{root.classList.toggle('bw-expanded');$('bw-expand').setAttribute('aria-pressed',root.classList.contains('bw-expanded'));$('bw-expand').textContent=root.classList.contains('bw-expanded')?'Compact view':'Expand view'};
-function updateUI(){const distances=riders.map((_,i)=>distanceAt(i,time)),ranking=riders.map((_,i)=>i).sort((a,b)=>distances[b]-distances[a]||ends[a]-ends[b]),lead=ranking[0];riders.forEach((r,i)=>{r.el.setAttribute('aria-pressed',i===selected);let gap=timeAt(i,distances[i])-timeAt(lead,distances[i]),s=sensor(i,time);const rank=ranking.indexOf(i)+1;r.el.querySelector('.bw-gap').textContent='#'+rank+' · '+(time>=r.finish?'Finished':i===lead?'Leader':'+'+fmt(gap));r.el.querySelector('.bw-progress-fill').style.width=(distances[i]/len*100)+'%';r.el.querySelector('.bw-sensors').textContent=time>=r.finish?'— W · — bpm':(s.watts??'—')+' W · '+(s.hr??'—')+' bpm'});let s=sensor(selected,time),d=distances[selected],p=roadAt(d);$('bw-power').textContent=s.watts??'—';$('bw-hr').textContent=s.hr??'—';$('bw-speed').textContent=s.speed==null?'—':s.speed.toFixed(1);$('bw-clock').textContent=fmt(time);$('bw-time').value=time;$('bw-selected-name').textContent=names[selected];$('bw-distance').textContent=((len-d)/1000).toFixed(2)+' km to go';$('bw-results').hidden=time<duration;if(time>=duration)$('bw-results-list').innerHTML=ranking.map((i,n)=>'<li><span>'+String(n+1).padStart(2,'0')+' · '+escapeHtml(names[i])+'</span><strong>'+fmt(ends[i])+'</strong><span>'+(n?'+'+fmt(ends[i]-ends[ranking[0]]):'Winner')+'</span></li>').join('');$('bw-detail').textContent=String.fromCharCode(65+selected)+' · '+names[selected]+' · '+(d/1000).toFixed(2)+' / '+(len/1000).toFixed(2)+' km · '+Math.round(p[2])+' m · '+(time>=ends[selected]?'Finished':'+'+fmt(Math.max(0,timeAt(selected,d)-timeAt(lead,d)))+' to leader');$('bw-mode').textContent=mode==='overview'?(webgl?'Serra de Tramuntana':'Aerial map · 2D fallback'):mode==='free'?'Explore the mountain':names[selected]+' · '+(mode==='ride'?'on the road':'chase camera');$('bw-hud-detail').textContent=mode==='overview'?(webgl?'Measured terrain · true vertical scale':'WebGL unavailable in this browser'):(d/1000).toFixed(2)+' km · '+Math.round(p[2])+' m altitude';updateCursors()}
-$('bw-play').onclick=()=>{if(time>=duration)time=0;playing=!playing;$('bw-play').textContent=playing?'Pause':'Play';updateUI()};$('bw-time').oninput=e=>{time=+e.target.value;updateUI()};$('bw-in').onclick=()=>{if(mode==='chase'||mode==='ride')setMode('free');radius=Math.max(60,radius*.75)};$('bw-out').onclick=()=>{if(mode==='chase'||mode==='ride')setMode('free');radius=Math.min(11000,radius/.75)};
-const canvas=renderer.domElement;canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,[e.clientX,e.clientY]);canvas.setPointerCapture(e.pointerId);if(mode==='chase'||mode==='ride')setMode('free');if(pointers.size===2){let p=[...pointers.values()];oldPinch=Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1])}});canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;let old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===2){let p=[...pointers.values()],v=Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1]);if(oldPinch)radius=Math.max(50,Math.min(12000,radius*oldPinch/v));oldPinch=v}else{theta-=(e.clientX-old[0])*.005;phi=Math.max(.1,Math.min(1.45,phi-(e.clientY-old[1])*.005))}});function release(e){pointers.delete(e.pointerId);oldPinch=0}canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('wheel',e=>{e.preventDefault();if(mode==='chase'||mode==='ride')setMode('free');radius=Math.max(50,Math.min(12000,radius*Math.exp(e.deltaY*.001)))},{passive:false});function relocate(e){let rect=canvas.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);let hits=ray.intersectObject(ground);if(hits.length){mode='free';root.querySelectorAll('[data-camera]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.camera==='free'));focus.copy(hits[0].point);radius=750;updateUI()}}canvas.addEventListener('dblclick',relocate);canvas.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){if(performance.now()-touchTap<330)relocate(e);touchTap=performance.now()}});
-let chartDefs=[];function charts(){if(typeof d3==='undefined')return;chartDefs=[];for(let [id,key] of [['bw-watts-chart','watts'],['bw-hr-chart','hr'],['bw-speed-chart','speed']]){const el=$(id),w=el.clientWidth,h=100,margin={l:30,r:5,t:7,b:22},data=riders[selected].samples,extent=d3.extent(data.filter(d=>d[key]!=null),d=>d[key]),x=d3.scaleLinear().domain([0,duration]).range([margin.l,w-margin.r]),y=d3.scaleLinear().domain([Math.max(0,(extent[0]??0)-Math.max(1,(extent[1]??1)-(extent[0]??0))*.12),(extent[1]??1)+Math.max(1,(extent[1]??1)-(extent[0]??0))*.12]).nice().range([h-margin.b,margin.t]);const svg=d3.select(el);svg.selectAll('*').remove();svg.attr('viewBox',`0 0 ${w} ${h}`);svg.append('g').attr('transform',`translate(0,${h-margin.b})`).call(d3.axisBottom(x).tickValues(w<180?[0,duration]:[0,duration/2,duration]).tickFormat(v=>Math.round(v/60)+'m').tickSize(0)).call(g=>g.select('.domain').attr('stroke','var(--line)'));svg.append('g').attr('transform',`translate(${margin.l},0)`).call(d3.axisLeft(y).ticks(2).tickSize(0)).call(g=>g.select('.domain').remove());svg.append('path').datum(data).attr('d',d3.line().defined(d=>d[key]!=null).x(d=>x(d.t)).y(d=>y(d[key]))).attr('fill','none').attr('stroke',cssColors[selected]).attr('stroke-width',1.5);if(extent[0]==null)svg.append('text').attr('x',w/2).attr('y',40).attr('text-anchor','middle').text('No sensor data');const cursor=svg.append('line').attr('y1',margin.t).attr('y2',h-margin.b).attr('stroke','var(--ink)').attr('opacity',.55);svg.append('rect').attr('x',margin.l).attr('y',margin.t).attr('width',Math.max(1,w-margin.l-margin.r)).attr('height',h-margin.t-margin.b).attr('fill','transparent').on('pointerdown',event=>{time=Math.max(0,Math.min(duration,x.invert(d3.pointer(event)[0])));updateUI()});chartDefs.push({cursor,x})}updateCursors()}
-function updateCursors(){chartDefs.forEach(c=>c.cursor.attr('x1',c.x(time)).attr('x2',c.x(time)))}
-new ResizeObserver(()=>{camera.aspect=world.clientWidth/world.clientHeight;camera.updateProjectionMatrix();renderer.setSize(world.clientWidth,world.clientHeight);charts()}).observe(world);
-function frame(now){const dt=Math.min(.08,(now-last)/1000||0);last=now;if(playing){time=Math.min(duration,time+dt*Number($('bw-rate').value));if(time>=duration){playing=false;$('bw-play').textContent='Replay'}}const d=distanceAt(selected,time),p=point(d),ahead=point(Math.min(len,d+45));if(mode==='chase'||mode==='ride'){let prev=point(Math.max(0,d-45)),dir=ahead.clone().sub(prev);dir.y=0;dir.normalize();if(mode==='chase'){camera.position.copy(p).addScaledVector(dir,-160);camera.position.y=Math.max(p.y+105,elevation(camera.position.x,camera.position.z)+55);camera.lookAt(p.clone().addScaledVector(dir,70))}else{camera.position.copy(p).add(new T.Vector3(0,7,0));ahead.y=Math.max(ahead.y,p.y)+5;camera.lookAt(ahead)}}else{camera.position.set(focus.x+radius*Math.sin(phi)*Math.sin(theta),focus.y+radius*Math.cos(phi),focus.z+radius*Math.sin(phi)*Math.cos(theta));camera.position.y=Math.max(camera.position.y,elevation(camera.position.x,camera.position.z)+20);camera.lookAt(focus)}
-riders.forEach((r,i)=>{const dist=distanceAt(i,time),pos=point(dist,9);r.pin.position.copy(pos).add(new T.Vector3(0,20,0));let size=Math.max(22,Math.min(130,camera.position.distanceTo(pos)*.025));r.pin.scale.setScalar(size);r.pin.visible=!(mode==='ride'&&i===selected);});
-endpointLabels.forEach(({el,p})=>{const v=p.clone().project(camera);el.style.display=(!webgl||v.z>1||Math.abs(v.x)>.9||Math.abs(v.y)>.9)?'none':'block';el.style.transform=`translate(${(v.x*.5+.5)*world.clientWidth}px,${(-v.y*.5+.5)*world.clientHeight}px) translate(-50%,-50%)`});$('bw-compass').style.transform=`rotate(${-theta}rad)`;renderer.render(scene,camera);if(now-lastUI>120){updateUI();lastUI=now}requestAnimationFrame(frame)}
-function drawFallback(){
- const c=fallbackContext,w=renderer.domElement.width,h=renderer.domElement.height,scale=Math.min(w/width,h/5400)*Math.min(8,6000/radius),fx=mode==='free'?focus.x:0,fz=mode==='free'?focus.z:0;
- c.fillStyle='#18271f';c.fillRect(0,0,w,h);c.save();c.translate(w/2,h/2);c.scale(scale,scale);c.translate(-fx,-fz);if(fallbackImage)c.drawImage(fallbackImage,-width/2,-depth/2,width,depth);c.beginPath();road.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.strokeStyle='#ffed9f';c.lineWidth=2/scale;c.stroke();c.restore();
- riders.forEach((r,i)=>{let p=roadAt(distanceAt(i,time)),x=w/2+(p[0]-fx)*scale,y=h/2+(p[1]-fz)*scale;c.beginPath();c.arc(x,y,i===selected?10:8,0,Math.PI*2);c.fillStyle=cssColors[i];c.fill();c.fillStyle='#122018';c.font='500 11px system-ui';c.textAlign='center';c.fillText(String.fromCharCode(65+i),x,y+4)});
+import { interpolate, timeAtDistance, telemetryAt, standings, formatClock, formatGap } from './race.js';
+import { elevationProfile, climbStats, gradeAt, gradeColor } from './profile.js';
+import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
+import { loadRace } from './data/source.js';
+import { renderProfile, createCharts } from './charts.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+boot().catch(error => {
+  console.error(error);
+  $('load-msg').textContent = error.message || 'Something went wrong. Please reload.';
+  app.dataset.phase = 'error';
+});
+
+async function fetchWithProgress(url, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Terrain could not load. Please reload.');
+  const total = Number(response.headers.get('content-length')) || 0;
+  if (!response.body || !total) return response.json();
+  const reader = response.body.getReader(), chunks = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); received += value.length;
+    onProgress(Math.min(1, received / total));
+  }
+  return JSON.parse(new TextDecoder().decode(await new Blob(chunks).arrayBuffer()));
 }
-charts();updateUI();requestAnimationFrame(frame);
-}catch(e){$('bw-loading').textContent=e.message;console.error(e)}
-})();
+
+async function boot() {
+  const bar = $('load-bar');
+  let progress = 0.05;
+  const setProgress = p => { progress = Math.max(progress, p); bar.style.transform = `scaleX(${progress})`; };
+  setProgress(0.08);
+  const worldModule = import('./world.js');
+  const [terrain, race] = await Promise.all([
+    fetchWithProgress('/terrain.json', p => setProgress(0.08 + p * 0.8)),
+    loadRace(),
+  ]);
+  setProgress(0.9);
+  if (Math.abs(race.distanceM - terrain.route.at(-1)[3]) > 1) throw new Error('Race distance does not match this climb.');
+
+  // ---- race model ---------------------------------------------------------
+  const riders = race.riders.map((r, i) => ({ ...r, index: i, letter: String.fromCharCode(65 + i), finish: r.samples.at(-1).t }));
+  const duration = Math.max(...riders.map(r => r.finish));
+  const route = terrain.route, len = route.at(-1)[3];
+  const stats = climbStats(route), profile = elevationProfile(route);
+  const distanceAt = (i, t) => interpolate(riders[i].samples, t, 'd');
+
+  const initial = parseState(location.search, { riderIds: riders.map(r => r.id), duration });
+  let time = initial.t, speed = initial.speed, playing = false, finishedShown = false;
+  let selected = Math.max(0, riders.findIndex(r => r.id === initial.rider));
+  let camMode = initial.cam;
+
+  // ---- static text --------------------------------------------------------
+  const km = (stats.length / 1000).toFixed(1);
+  $('meta').textContent = `${km} km · +${Math.round(stats.top - stats.start)} m · ${stats.avgGrade.toFixed(1)}% avg`;
+  $('intro-meta').textContent = `${km} km · ${Math.round(stats.start)} → ${Math.round(stats.top)} m · ${riders.length} riders`;
+  $('badge-text').textContent = race.simulated ? 'Simulated' : 'Recorded';
+  if (!race.simulated) $('sim-note').textContent = 'Recorded telemetry; missing sensor values are shown as —.';
+  $('duration').textContent = '/ ' + formatClock(duration);
+  const scrub = $('scrub');
+  scrub.max = String(Math.ceil(duration));
+  $('speed').textContent = speed + '×';
+
+  // ---- standings board ------------------------------------------------------
+  const board = $('board');
+  const rows = riders.map((r, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
+    li.querySelector('.nm').textContent = r.name;
+    li.querySelector('button').addEventListener('click', () => followRider(i));
+    board.append(li);
+    return { li, rank: li.querySelector('.rank'), gap: li.querySelector('.gap'), sens: li.querySelector('.sens'), prog: li.querySelector('.prog i'), btn: li.querySelector('button') };
+  });
+
+  // ---- 3D world ------------------------------------------------------------
+  // Callbacks from the world can fire while it is still loading; they wait until the HUD is wired (`live`).
+  let world = null, live = false;
+  try {
+    const { createWorld } = await worldModule;
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i) });
+    world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
+    await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
+  } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
+  if (!world) {
+    const img = new Image();
+    img.src = terrain.texture; img.alt = 'Aerial imagery of the climb'; img.className = 'fallback';
+    $('stage').prepend(img);
+    $('cams').hidden = true;
+    toast('3D needs WebGL — showing the race standings only.');
+  }
+  setProgress(1);
+
+  // ---- controls ---------------------------------------------------------------
+  function select(i) {
+    selected = i;
+    world?.select(i);
+    app.style.setProperty('--rider', riders[i].color);
+    charts.show(riders[i]);
+    $('t-name').textContent = riders[i].name;
+    updateUi(true);
+    pushState(true);
+  }
+  // Picking a rider from the board or a 3D label: keep a rider camera, leave the map views for Follow.
+  function followRider(i) {
+    select(i);
+    if (camMode !== 'pov') setCam('follow');
+  }
+  function setCam(mode) {
+    if (!world || !CAMERAS.includes(mode)) return;
+    if (world.introRunning) world.skipIntro(); // ends the intro through its onDone, so the race still starts
+    camMode = mode;
+    world.setMode(mode);
+    syncCams();
+    pushState(true);
+  }
+  function syncCams() {
+    for (const b of $('cams').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.cam === camMode));
+  }
+  function setPlaying(on) {
+    if (on && time >= duration) { time = 0; finishedShown = false; }
+    playing = on;
+    app.classList.toggle('playing', on);
+    $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
+    if (!on) pushState(true);
+  }
+  function seek(t) {
+    time = Math.max(0, Math.min(duration, t));
+    if (time < duration) finishedShown = false;
+    updateUi(true);
+    pushState();
+  }
+  $('cams').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setCam(b.dataset.cam); });
+  $('play').addEventListener('click', () => setPlaying(!playing));
+  $('speed').addEventListener('click', () => {
+    speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+    $('speed').textContent = speed + '×';
+    pushState(true);
+  });
+  scrub.addEventListener('input', () => seek(+scrub.value));
+  $('share').addEventListener('click', async () => {
+    pushState(true);
+    const url = location.href;
+    try {
+      if (navigator.share && matchMedia('(pointer: coarse)').matches) await navigator.share({ title: document.title, url });
+      else { await navigator.clipboard.writeText(url); toast('Link copied — it opens at this moment.'); }
+    } catch (error) { if (error?.name !== 'AbortError') toast(url); }
+  });
+  $('replay').addEventListener('click', () => { $('podium').hidden = true; setPlaying(true); });
+  $('podium-close').addEventListener('click', () => { $('podium').hidden = true; });
+  addEventListener('keydown', e => {
+    if (e.target.closest('input,select,textarea') && e.key !== ' ') return;
+    if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === 'ArrowRight') seek(time + 15);
+    else if (e.key === 'ArrowLeft') seek(time - 15);
+    else if (e.key === ']') select((selected + 1) % riders.length);
+    else if (e.key === '[') select((selected + riders.length - 1) % riders.length);
+    else if (/^[1-4]$/.test(e.key)) setCam(CAMERAS[e.key - 1]);
+  });
+
+  const profileChart = renderProfile($('profile'), profile, len, riders, d => seek(timeAtDistance(riders[selected].samples, d)));
+  const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration);
+
+  // ---- bottom sheet -------------------------------------------------------------
+  const sheet = $('sheet');
+  const desktop = matchMedia('(min-width: 960px)');
+  let snap = 'peek', sheetY = 0, dragStart = null;
+  function snapHeights() {
+    const top = sheet.getBoundingClientRect().top - sheetY;
+    const peek = $('standings-title').getBoundingClientRect().top - sheetY - top;
+    const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
+    return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
+  }
+  function placeSheet(y, animate = true) {
+    sheetY = Math.max(0, y);
+    sheet.style.transition = animate ? '' : 'none';
+    sheet.style.transform = desktop.matches ? '' : `translate3d(0,${sheetY}px,0)`;
+    app.style.setProperty('--sheet-visible', desktop.matches ? '0px' : `${sheet.offsetHeight - sheetY}px`);
+  }
+  function setSnap(name, animate = true) {
+    snap = name;
+    sheet.dataset.snap = name;
+    world?.setInsetRight(desktop.matches ? innerWidth - sheet.offsetLeft : 0);
+    if (desktop.matches) return placeSheet(0, false);
+    const h = snapHeights();
+    placeSheet(sheet.offsetHeight - h[name], animate);
+  }
+  const grabZone = [$('grab'), $('transport')];
+  for (const el of grabZone) {
+    el.addEventListener('pointerdown', e => {
+      if (desktop.matches || e.target.closest('button')) return;
+      dragStart = { y: e.clientY, sheetY, t: performance.now(), moved: false };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', e => {
+      if (!dragStart) return;
+      const dy = e.clientY - dragStart.y;
+      if (Math.abs(dy) > 4) dragStart.moved = true;
+      placeSheet(dragStart.sheetY + dy, false);
+    });
+    el.addEventListener('pointerup', e => {
+      if (!dragStart) return;
+      const { y, moved, t } = dragStart, dy = e.clientY - y, v = dy / Math.max(1, performance.now() - t);
+      dragStart = null;
+      const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
+      if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
+      const order = ['peek', 'half', 'full'];
+      let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
+      if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
+      setSnap(target);
+    });
+    el.addEventListener('pointercancel', () => { dragStart = null; setSnap(snap); });
+  }
+  new ResizeObserver(() => { profileChart.resize(); charts.resize(); setSnap(snap, false); }).observe(sheet);
+  desktop.addEventListener('change', () => setSnap(snap, false));
+
+  // ---- URL state -----------------------------------------------------------------
+  let lastPush = 0;
+  function pushState(force = false) {
+    // Nothing is written before the race phase: a boot-time ?t=0 would make every reload look like a shared link and skip the intro.
+    if (app.dataset.phase !== 'race') return;
+    const now = performance.now();
+    if (!force && now - lastPush < 1000) return;
+    lastPush = now;
+    history.replaceState(null, '', serializeState({ t: time, rider: riders[selected].id, cam: camMode, speed }));
+  }
+
+  // ---- HUD -------------------------------------------------------------------------
+  let lastUi = 0;
+  const text = (id, v) => { const el = $(id); if (el.textContent !== v) el.textContent = v; };
+  function updateUi(force = false) {
+    const now = performance.now();
+    if (!force && now - lastUi < 100) return;
+    lastUi = now;
+    const table = standings(riders, time), byIndex = [];
+    for (const row of table) byIndex[row.index] = row;
+    table.forEach((row, n) => {
+      const r = rows[row.index], tel = telemetryAt(riders[row.index].samples, time);
+      r.li.style.order = n;
+      r.btn.setAttribute('aria-pressed', String(row.index === selected));
+      r.rank.textContent = row.rank;
+      r.gap.textContent = row.finished ? (row.rank === 1 ? formatClock(row.finish) : formatGap(row.gap)) : row.rank === 1 ? 'Leader' : formatGap(row.gap);
+      r.sens.textContent = row.finished ? 'Finished' : `${tel.watts ?? '—'} W · ${tel.hr ?? '—'} bpm`;
+      r.prog.style.transform = `scaleX(${row.d / len})`;
+    });
+    const me = byIndex[selected], tel = telemetryAt(riders[selected].samples, time), rider = riders[selected];
+    text('f-letter', rider.letter);
+    text('f-name', rider.name);
+    text('f-pos', me.finished ? `Finished P${me.rank} · ${formatClock(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
+    text('f-togo', ((len - me.d) / 1000).toFixed(2));
+    text('f-w', me.finished ? '—' : String(tel.watts ?? '—'));
+    text('f-hr', me.finished ? '—' : String(tel.hr ?? '—'));
+    text('f-v', me.finished || tel.speed == null ? '—' : tel.speed.toFixed(1));
+    const grade = gradeAt(route, me.d, 200); // same smoothing scale as the profile colours
+    text('f-g', grade.toFixed(1));
+    $('f-g').style.color = `rgb(${gradeColor(grade)})`;
+    text('clock', formatClock(time));
+    scrub.value = String(Math.round(time));
+    scrub.style.setProperty('--p', (time / duration * 100).toFixed(2) + '%');
+    profileChart.update(riders.map((_, i) => distanceAt(i, time)), selected);
+    charts.cursor(time);
+    app.classList.toggle('finished', me.finished);
+  }
+
+  // ---- intro ---------------------------------------------------------------------------
+  const captions = [
+    [0.0, ''],
+    [0.27, `The summit · ${Math.round(stats.top)} m`],
+    [0.45, `${km} km at ${stats.avgGrade.toFixed(1)}% · max ${stats.maxGrade.toFixed(0)}%`],
+    [0.72, `Caimari · ${Math.round(stats.start)} m · ${riders.length} riders on the line`],
+  ];
+  function runIntro() {
+    world.setInsetRight(0); // the desktop panel is hidden during the intro
+    app.dataset.phase = 'intro';
+    let shown = -1;
+    world.startIntro({
+      duration: 12500,
+      onProgress: u => {
+        const i = captions.findLastIndex(([at]) => u >= at);
+        if (i !== shown) { shown = i; const cap = $('intro-cap'); cap.classList.remove('in'); void cap.offsetWidth; cap.textContent = captions[i][1]; if (captions[i][1]) cap.classList.add('in'); }
+        app.classList.toggle('intro-titled', u < 0.24);
+      },
+      onDone: () => {
+        app.dataset.phase = 'race';
+        app.classList.remove('intro-titled');
+        setSnap(snap, false);
+        camMode = 'follow'; syncCams();
+        const go = $('go'); go.classList.add('in'); setTimeout(() => go.classList.remove('in'), 1100);
+        setTimeout(() => setPlaying(true), 450);
+      },
+    });
+    $('skip').onclick = () => world.skipIntro();
+  }
+
+  // ---- loop ------------------------------------------------------------------------------
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (playing) {
+      time = Math.min(duration, time + dt * speed);
+      if (time >= duration) {
+        setPlaying(false);
+        if (!finishedShown) { finishedShown = true; showPodium(); }
+      }
+      pushState();
+    }
+    if (world) world.frame({ time, distances: riders.map((_, i) => distanceAt(i, time)), playing, rate: speed });
+    updateUi();
+    requestAnimationFrame(tick);
+  }
+
+  function showPodium() {
+    const table = standings(riders, duration);
+    $('podium-list').innerHTML = '';
+    for (const row of table) {
+      const r = riders[row.index], li = document.createElement('li');
+      li.style.setProperty('--c', r.color);
+      li.innerHTML = `<span class="pos"></span><b class="letter">${r.letter}</b><span class="nm"></span><strong></strong><span class="gap"></span>`;
+      li.querySelector('.pos').textContent = row.rank;
+      li.querySelector('.nm').textContent = r.name;
+      li.querySelector('strong').textContent = formatClock(row.finish);
+      li.querySelector('.gap').textContent = row.rank === 1 ? 'Winner' : formatGap(row.gap);
+      $('podium-list').append(li);
+    }
+    $('podium').hidden = false;
+  }
+
+  // ---- go ------------------------------------------------------------------------------------
+  live = true;
+  select(selected);
+  syncCams();
+  setSnap('peek', false);
+  updateUi(true);
+  requestAnimationFrame(tick);
+  app.dataset.phase = 'ready';
+  await new Promise(r => setTimeout(r, 250));
+  if (!world) { app.dataset.phase = 'race'; return; }
+  if (initial.shared || reducedMotion) {
+    world.setMode(camMode);
+    syncCams();
+    app.dataset.phase = 'race';
+    if (!initial.shared) setPlaying(true);
+  } else runIntro();
+}
+
+let toastTimer = 0;
+function toast(message) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.add('in');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('in'), 2600);
+}

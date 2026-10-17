@@ -3,3 +3,70 @@
 #batalla-world{--ink:light-dark(#172324,#eef2ed);--dim:light-dark(#596863,#b5c1b7);--panel:light-dark(#f4f6f2,#17211d);--line:light-dark(#d9e0d8,#35423a);--raised:light-dark(#fff,#253129);--active:light-dark(#223d30,#e3efcf);--onactive:light-dark(#fff,#1e2a20);color:var(--ink);font:14px system-ui,sans-serif;color-scheme:dark}#batalla-world *{box-sizing:border-box}#batalla-world .bw-head{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:18px 0}#batalla-world h2{font-size:23px;font-weight:500;letter-spacing:-.7px;margin:0}#batalla-world .bw-sub{color:var(--dim);font-size:12px;margin-top:5px}#batalla-world button,#batalla-world select{font:500 12px system-ui;min-height:38px;border:1px solid var(--line);background:var(--raised);color:var(--ink);border-radius:6px;padding:8px 11px}#batalla-world button[aria-pressed=true]{background:var(--active);color:var(--onactive)}#batalla-world .bw-tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}#batalla-world .bw-layout{display:grid;grid-template-columns:minmax(0,1fr) 175px;gap:12px}#batalla-world .bw-world{height:500px;position:relative;background:var(--panel);overflow:hidden;border-radius:8px}#batalla-world .bw-world canvas{display:block;width:100%;height:100%;touch-action:none}#batalla-world .bw-hud{position:absolute;left:14px;top:14px;color:#fff;text-shadow:0 1px 6px #000;pointer-events:none;font-size:12px}#batalla-world .bw-hud strong{display:block;font-size:20px;font-weight:500;margin-bottom:4px}#batalla-world .bw-location{position:absolute;bottom:14px;left:14px;color:#fff;text-shadow:0 1px 6px #000;font-size:11px;pointer-events:none}#batalla-world .bw-label{position:absolute;left:0;top:0;pointer-events:none;color:white;text-shadow:0 1px 4px black;font-size:11px;white-space:nowrap}#batalla-world .bw-compass{position:absolute;right:14px;top:14px;color:#fff;text-shadow:0 1px 4px #000;font-size:12px}#batalla-world .bw-riders{display:flex;flex-direction:column;gap:7px}#batalla-world .bw-rider{text-align:left;display:block;width:100%;min-height:76px}#batalla-world .bw-rider .bw-row{display:flex;justify-content:space-between;gap:6px;margin-bottom:5px}#batalla-world .bw-rider small{display:block;font-size:11px;opacity:.8;font-weight:400}#batalla-world .bw-chip{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}#batalla-world .bw-telemetry{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 0 10px}#batalla-world .bw-stat{font-size:12px;color:var(--dim)}#batalla-world .bw-stat strong{font-size:26px;font-weight:500;color:var(--ink);letter-spacing:-.7px;margin-right:4px}#batalla-world .bw-stat div{margin-bottom:4px}#batalla-world .bw-timebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line)}#batalla-world .bw-timebar input{flex:1;min-width:120px;accent-color:var(--active)}#batalla-world .bw-timebar output{font-variant-numeric:tabular-nums;font-size:16px;min-width:47px}#batalla-world .bw-chartgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:14px}#batalla-world .bw-chartgrid svg{width:100%;height:100px;display:block;overflow:visible}#batalla-world .bw-chartgrid text{font:11px system-ui;fill:var(--dim)}#batalla-world .bw-caption{font-size:11px;color:var(--dim);padding-top:12px;line-height:1.5}#batalla-world .bw-caption a{color:inherit}#batalla-world .bw-loading{position:absolute;inset:0;display:grid;place-items:center;background:var(--panel);color:var(--ink);padding:25px;text-align:center}#batalla-world .bw-expand{margin-left:auto}#batalla-world .bw-detail{font-size:12px;color:var(--dim);min-height:18px}#batalla-world .bw-zoom{position:absolute;right:10px;bottom:12px;display:flex;gap:5px}#batalla-world .bw-zoom button{color:var(--ink);background:var(--panel);min-width:36px}#batalla-world.bw-expanded .bw-world{height:650px}@media(max-width:650px){#batalla-world .bw-layout{grid-template-columns:1fr}#batalla-world .bw-world{height:420px}#batalla-world .bw-riders{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}#batalla-world .bw-rider{padding:8px 4px;min-height:70px;text-align:center}#batalla-world .bw-rider .bw-row{display:block}#batalla-world .bw-rider .bw-name{display:none}#batalla-world .bw-rider small{font-size:10px}#batalla-world h2{font-size:21px}#batalla-world .bw-chartgrid{gap:7px}#batalla-world .bw-stat strong{font-size:23px}#batalla-world .bw-head{display:block}#batalla-world .bw-expand{margin-left:0}#batalla-world.bw-expanded .bw-world{height:560px}}
 
 #batalla-world button:disabled{opacity:.5;cursor:not-allowed}
+
+#batalla-world{--rider-color:#ffd34d}
+#batalla-world .bw-head{padding:16px 0 20px}
+#batalla-world h2{font-size:30px;letter-spacing:-1px}
+#batalla-world .bw-tools button{min-height:44px;padding:10px 15px}
+#batalla-world .bw-layout{grid-template-columns:minmax(0,1fr) 180px}
+#batalla-world .bw-world{height:clamp(460px,62vh,700px);border-radius:12px}
+#batalla-world .bw-rider{position:relative;overflow:hidden;border-radius:8px;background:#18251e;padding:14px 12px;color:#dce8dc;border-color:#344538;min-height:84px}
+#batalla-world .bw-rider[aria-pressed=true]{background:#263c2d;color:#fff;border-color:#acc7a2}
+#batalla-world .bw-rider small{color:inherit;opacity:.75}
+#batalla-world .bw-progress{height:3px;background:#344438;margin-top:9px;border-radius:2px;overflow:hidden}
+#batalla-world .bw-progress-fill{height:100%;width:0;transition:width .15s linear}
+#batalla-world .bw-selected{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding-top:18px;color:#b9cbbb}
+#batalla-world .bw-selected strong{color:#f0f4ed;font-weight:500}
+#batalla-world .bw-selected-dot{display:inline-block;background:var(--rider-color);width:8px;height:8px;border-radius:50%;margin-right:8px}
+#batalla-world .bw-telemetry{padding:12px 0 14px;gap:12px}
+#batalla-world .bw-stat strong{font-size:35px;font-variant-numeric:tabular-nums}
+#batalla-world .bw-stat div{font-size:11px;letter-spacing:1.1px;color:#b8c4b9}
+#batalla-world .bw-timebar{padding:12px 0;gap:12px}
+#batalla-world .bw-timebar button{min-width:64px;min-height:46px;background:#e1edcf;color:#17261b;border:0}
+#batalla-world .bw-timebar input{height:38px;accent-color:#d3e6bd}
+#batalla-world .bw-timebar select{min-height:44px}
+#batalla-world .bw-timebar output{color:#e2eadf}
+#batalla-world .bw-chartgrid{border-top:1px solid #334135;padding-top:18px;margin-top:0}
+#batalla-world .bw-results{padding:26px 0 10px}
+#batalla-world .bw-results[hidden]{display:none}
+#batalla-world .bw-results h2{margin:8px 0 18px}
+#batalla-world .bw-results ol{padding:0;margin:0;list-style:none}
+#batalla-world .bw-results li{display:grid;grid-template-columns:1fr 75px 70px;gap:12px;padding:13px 0;border-bottom:1px solid #344236;color:#c6d2c5;font-variant-numeric:tabular-nums}
+#batalla-world .bw-results li:first-child{color:#f7d475}
+#batalla-world .bw-results strong{font-weight:500}
+#batalla-world .bw-chartgrid svg{height:115px}
+@media(max-width:650px){
+ main{padding:8px 14px 22px;padding-bottom:max(22px,env(safe-area-inset-bottom))}
+ #batalla-world .bw-head{padding:12px 0 15px}
+ #batalla-world h2{font-size:25px}
+ #batalla-world .bw-head>.bw-sub{font-size:10px;letter-spacing:1px;margin-top:8px}
+ #batalla-world .bw-tools{display:flex;gap:5px;flex-wrap:wrap}
+ #batalla-world .bw-tools button{font-size:11px;padding:9px 10px;flex:1;white-space:nowrap}
+ #batalla-world .bw-expand{display:none}
+ #batalla-world .bw-layout{display:flex;flex-direction:column;gap:12px}
+ #batalla-world .bw-world{height:clamp(350px,51svh,510px);border-radius:10px}
+ #batalla-world .bw-hud{top:13px;left:13px}
+ #batalla-world .bw-hud strong{font-size:17px}
+ #batalla-world .bw-location{font-size:10px;max-width:72%;line-height:1.5}
+ #batalla-world .bw-riders{display:flex;flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:5px;scroll-snap-type:x proximity;scrollbar-width:thin}
+ #batalla-world .bw-rider{flex:0 0 126px;min-height:92px;padding:11px 10px;scroll-snap-align:start;text-align:left}
+ #batalla-world .bw-rider .bw-row{display:block;margin-bottom:5px;font-size:12px}
+ #batalla-world .bw-rider .bw-name{display:inline}
+ #batalla-world .bw-rider small{font-size:11px}
+ #batalla-world .bw-gap{font-size:12px}
+ #batalla-world .bw-selected{padding-top:10px;font-size:12px}
+ #batalla-world .bw-stat strong{font-size:30px;letter-spacing:-.8px}
+ #batalla-world .bw-stat{font-size:11px}
+ #batalla-world .bw-telemetry{padding:12px 0 10px;gap:7px}
+ #batalla-world .bw-detail{font-size:11px;line-height:1.5}
+ #batalla-world .bw-timebar{position:sticky;bottom:0;z-index:4;background:#101814;padding:10px 0;padding-bottom:max(10px,env(safe-area-inset-bottom));display:grid;grid-template-columns:62px 1fr 61px;gap:6px 10px}
+ #batalla-world .bw-timebar output{grid-column:2;grid-row:1;text-align:center;font-size:17px}
+ #batalla-world .bw-timebar input{grid-column:1/-1;grid-row:2;width:100%;height:30px;margin:0;min-width:0}
+ #batalla-world .bw-timebar label{grid-column:3;grid-row:1}
+ #batalla-world .bw-timebar select{width:100%;padding:8px 5px}
+ #batalla-world .bw-chartgrid{gap:8px;padding-top:14px}
+ #batalla-world .bw-chartgrid svg{height:95px}
+ #batalla-world .bw-chartgrid text{font-size:10px}
+ #batalla-world .bw-caption{font-size:10px;line-height:1.65}
+}
+@media(prefers-reduced-motion:reduce){#batalla-world .bw-progress-fill{transition:none}}

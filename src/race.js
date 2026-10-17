@@ -43,3 +43,36 @@ export function telemetryAt(samples, t) {
   const watts = interpolate(samples, t, 'watts'), hr = interpolate(samples, t, 'hr');
   return { speed: interpolate(samples, t, 'speed'), watts: watts == null ? null : Math.round(watts), hr: hr == null ? null : Math.round(hr) };
 }
+
+// Riders ordered by position at time t. Finished riders rank by finish time;
+// the rest by distance covered. `gap` is seconds behind the leader at the same
+// point of the road (for finishers: finish-time difference to the winner).
+export function standings(riders, t) {
+  const rows = riders.map((rider, index) => {
+    const finish = rider.samples.at(-1).t;
+    return { index, d: interpolate(rider.samples, t, 'd'), finish, finished: t >= finish };
+  });
+  rows.sort((a, b) => (b.finished - a.finished) || (a.finished ? a.finish - b.finish : b.d - a.d) || a.finish - b.finish);
+  const lead = rows[0];
+  for (const [rank, row] of rows.entries()) {
+    row.rank = rank + 1;
+    row.gap = row.finished
+      ? row.finish - lead.finish
+      : Math.max(0, timeAtDistance(riders[row.index].samples, row.d) - timeAtDistance(riders[lead.index].samples, row.d));
+  }
+  return rows;
+}
+
+// "+0.4s", "+12s", "+1:05": small gaps keep a decimal so a tight race never reads "+0:00".
+export function formatGap(seconds) {
+  const s = Math.max(0, seconds);
+  if (s < 10) return `+${s.toFixed(1)}s`;
+  if (s < 60) return `+${Math.round(s)}s`;
+  return '+' + formatClock(s);
+}
+
+export function formatClock(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}

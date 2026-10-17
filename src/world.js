@@ -11,7 +11,7 @@ const SUN_DIR = new THREE.Vector3(-0.74, 0.56, 0.42).normalize(); // low WSW aft
 const HAZE = new THREE.Color(0xc4d0da), ZENITH = new THREE.Color(0x2f5f9e), SUN_TINT = new THREE.Color(0xffd9a0);
 
 // Async so the build yields to the browser between heavy steps (keeps phones responsive).
-export async function createWorld({ container, labels, terrain, race, onSelect }) {
+export async function createWorld({ container, labels, terrain, race, onSelect, onPageDrag }) {
   const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
   const coarse = matchMedia('(pointer: coarse)').matches;
   const maxDpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
@@ -431,16 +431,24 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   }
 
   // ---- input --------------------------------------------------------------
+  // Touch: one finger swiping vertically belongs to the page (the race sheet, via onPageDrag),
+  // so the standings are always one swipe away; two fingers move the map. A sideways one-finger
+  // swipe still turns the camera. Mouse and pen keep the full one-button map controls.
   const pointers = new Map();
-  let pinch = 0, mid = null, lastTap = 0, dragged = 0;
+  let pinch = 0, mid = null, lastTap = 0, dragged = 0, touchAxis = null, touchStart = null;
   const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const endPageDrag = y => { if (touchAxis === 'y') onPageDrag?.('end', y); touchAxis = 'map'; };
   canvas.addEventListener('pointerdown', e => {
     if (rig.intro) { skipIntro(); return; }
     pointers.set(e.pointerId, [e.clientX, e.clientY]);
     canvas.setPointerCapture(e.pointerId);
     dragged = 0;
     rig.lastInput = performance.now();
-    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+    if (pointers.size === 1) { touchAxis = e.pointerType === 'touch' ? null : 'map'; touchStart = [e.clientX, e.clientY]; }
+    if (pointers.size === 2) {
+      endPageDrag(e.clientY);
+      const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    }
   });
   canvas.addEventListener('pointermove', e => {
     if (!pointers.has(e.pointerId)) return;
@@ -453,19 +461,45 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       const [a, b] = [...pointers.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       if (pinch) zoom(pinch / dist);
       if (mid && rig.mode !== 'follow' && rig.mode !== 'pov') pan(m[0] - mid[0], m[1] - mid[1]);
+      else if (mid && e.pointerType === 'touch') rotate(m[0] - mid[0], m[1] - mid[1]);
       pinch = dist; mid = m;
-    } else if (e.shiftKey || e.buttons === 2) pan(dx, dy);
+      return;
+    }
+    if (touchAxis === null) {
+      const tx = e.clientX - touchStart[0], ty = e.clientY - touchStart[1];
+      if (Math.hypot(tx, ty) < 10) return;
+      touchAxis = Math.abs(ty) > Math.abs(tx) ? 'y' : 'x';
+      if (touchAxis === 'y') onPageDrag?.('start', touchStart[1]);
+    }
+    if (touchAxis === 'y') onPageDrag?.('move', e.clientY);
+    else if (touchAxis === 'x') rotate(dx, 0);
+    else if (e.shiftKey || e.buttons === 2) pan(dx, dy);
     else rotate(dx, dy);
   });
   const release = e => {
     pointers.delete(e.pointerId);
     pinch = 0; mid = null;
+    if (!pointers.size) endPageDrag(e.clientY);
     if (e.type === 'pointerup' && dragged < 8) {
       const now = performance.now();
       if (now - lastTap < 320) doubleTap(e);
+      else tapRider(e);
       lastTap = now;
     }
   };
+  // A tap within 32 px of a rider's body follows them, like a tap on their label.
+  function tapRider(e) {
+    const rect = canvas.getBoundingClientRect();
+    let best = -1, bestD = 32;
+    riders.forEach((r, i) => {
+      project.copy(r.pos).y += 0.9 * RIDER_SCALE;
+      project.project(camera);
+      if (project.z >= 1) return;
+      const d = Math.hypot((project.x * 0.5 + 0.5) * w - (e.clientX - rect.left), (-project.y * 0.5 + 0.5) * h - (e.clientY - rect.top));
+      if (d < bestD) { best = i; bestD = d; }
+    });
+    if (best >= 0) onSelect(best);
+  }
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('contextmenu', e => e.preventDefault());

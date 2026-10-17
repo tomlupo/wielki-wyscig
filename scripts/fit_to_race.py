@@ -6,7 +6,8 @@
 
     uv run scripts/fit_to_race.py "El Lobo=rides/lobo.fit" "Krzysiek=rides/krzys.gpx:#4fc3f7"
 
-Each argument is NAME=PATH[:#colour]. Whole rides are fine: the climb is found
+Each argument is NAME=PATH[:#colour][@MM:SS]. @MM:SS is the official segment
+time (e.g. from Strava); when given, the rider's clock is stretched to it. Whole rides are fine: the climb is found
 automatically by matching GPS points to the reference road in
 public/terrain.json (`route`), and cut at the FIRST arrival at the summit, so a
 café stop at the top does not count.
@@ -186,10 +187,14 @@ def main(args):
     riders = []
     for n, arg in enumerate(args):
         name, spec = arg.split("=", 1)
+        spec, _, official = spec.partition("@")
         path, _, colour = spec.partition(":")
         p = Path(path)
         rows = read_fit(p) if p.suffix.lower() == ".fit" else read_gpx(p)
         T, D, seg, on, total = climb(rows, terrain)
+        if official:  # the official segment time wins: GPS start/finish are ~±1 min off it
+            mm, ss = official.split(":")
+            T = T * ((int(mm) * 60 + int(ss)) / T[-1])
         s = samples(T, D, seg, total)
         rid = "".join(
             ch for ch in name.lower().replace(" ", "-") if ch.isalnum() or ch == "-"

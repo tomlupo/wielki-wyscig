@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { validateRace, interpolate, timeAtDistance, telemetryAt } from '../src/race.js';
-const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+const race = JSON.parse(readFileSync(new URL('./fixtures/sample-race.json', import.meta.url)));
 test('sample race has five valid full-segment efforts finishing in 26–34 minutes', () => {
   assert.equal(validateRace(race), race);
   assert.deepEqual(race.riders.map(r => r.samples.at(-1).t), [1560, 1650, 1770, 1890, 2040]);

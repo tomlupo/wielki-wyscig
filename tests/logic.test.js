@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { standings, formatGap, formatClock } from '../src/race.js';
 import { parseState, serializeState } from '../src/state.js';
 
-const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+const race = JSON.parse(readFileSync(new URL('./fixtures/sample-race.json', import.meta.url)));
 
 test('standings: finishers rank by finish time, gaps are time behind the leader at the same point', () => {
   const t = 1700, rows = standings(race.riders, t);

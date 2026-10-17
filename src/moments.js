@@ -92,6 +92,7 @@ export function detectMoments(riders, route, { step = 5, max = 8 } = {}) {
     const attack = found.find(a => a.kind === 'attack' && a.rider === m.rider && Math.abs(a.t - m.t) <= 120);
     if (!attack) continue;
     attack.label = `${name(m.rider)} attacks · ${m.kind === 'lead' ? 'new leader' : m.label.slice(name(m.rider).length + 1)}`;
+    attack.leads = m.kind === 'lead';
     m.kind = 'merged';
   }
 
@@ -100,5 +101,12 @@ export function detectMoments(riders, route, { step = 5, max = 8 } = {}) {
   for (const m of found.filter(m => m.kind !== 'merged').sort((a, b) => PRIORITY[b.kind] - PRIORITY[a.kind] || a.t - b.t)) {
     if (kept.length < max && kept.every(k => Math.abs(k.t - m.t) >= minGap)) kept.push(m);
   }
-  return kept.sort((a, b) => a.t - b.t);
+  // A see-saw for the lead can lose its middle to the spacing above: never say twice in a row who leads.
+  let leader = null;
+  return kept.sort((a, b) => a.t - b.t).filter(m => {
+    if (m.kind !== 'lead' && !m.leads) return true;
+    const repeat = m.rider === leader;
+    leader = m.rider;
+    return !repeat;
+  }).map(({ leads, ...m }) => m);
 }

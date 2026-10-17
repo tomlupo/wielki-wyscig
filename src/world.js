@@ -2,133 +2,58 @@
 // Loaded as its own chunk so the HUD paints before three.js arrives.
 import * as THREE from 'three';
 import { gradeAt, gradeColor } from './profile.js';
+import { SUN_DIR, SUN_COLOR, createSky, createSea, createFarLand } from './atmosphere.js';
+import { buildTerrain } from './terrain.js';
+import { createPost } from './post.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const RIDER_SCALE = 5; // riders are drawn 5× life size so they read on a 31 m terrain grid
 const ROAD_LIFT = 1.6, ROAD_RADIUS = 2.6;
-const FOLLOW_HOME = { theta: 0, phi: 1.2, radius: 150 };
-const SUN_DIR = new THREE.Vector3(-0.74, 0.56, 0.42).normalize(); // low WSW afternoon sun
-const HAZE = new THREE.Color(0xc4d0da), ZENITH = new THREE.Color(0x2f5f9e), SUN_TINT = new THREE.Color(0xffd9a0);
+// Camera framings: offsets of the follow rig around the rider (theta: around, 0 = behind;
+// phi: from vertical; fov: vertical degrees on a landscape screen, ×1.3 on a portrait one).
+// Wide and long-lens on purpose: the riders sit IN the landscape, their labels carry them.
+const FOLLOW_HOME = { theta: 0, phi: 1.33, radius: 320, ahead: 50, lift: 10, fov: 38 };
+// Broadcast shots for the auto camera. spin: slow orbit (rad/s); push: slow dolly (radius ×e^(push·t));
+// group: frame the riders around the selected one, not the rider alone.
+const SHOTS = {
+  side: { theta: Math.PI / 2, phi: 1.3, radius: 200, ahead: 6, lift: 6, fov: 30, push: -0.012 }, // moto alongside, long lens
+  heli: { theta: 0.55, phi: 0.72, radius: 950, ahead: 40, lift: 0, fov: 36, spin: 0.012 }, // helicopter above the race
+  drone: { theta: 0.9, phi: 0.98, radius: 560, ahead: 0, lift: 0, fov: 40, spin: 0.07, group: true }, // slow orbit round the group
+  high: { theta: Math.PI / 2, phi: 0.74, radius: 780, ahead: 0, lift: 0, fov: 32, push: -0.02, group: true }, // high side tracking
+  ahead: { theta: Math.PI, phi: 1.4, radius: 680, ahead: 0, lift: 8, fov: 18, push: -0.03 }, // long lens from up the road
+};
+const POV_FOV = 55, MAP_FOV = 42;
 
 // Async so the build yields to the browser between heavy steps (keeps phones responsive).
 export async function createWorld({ container, labels, terrain, race, onSelect, onPageDrag }) {
   const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
   const coarse = matchMedia('(pointer: coarse)').matches;
+  const lite = coarse && (navigator.hardwareConcurrency || 8) <= 4; // a weak phone: lighter mesh, no bloom
   const maxDpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
   let dpr = maxDpr;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.2;
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', '3D replay of the climb over aerial imagery and measured terrain');
   container.prepend(canvas);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(HAZE, 0.000052);
-  const camera = new THREE.PerspectiveCamera(50, 1, 2, 60000);
+  scene.fog = new THREE.Fog(0xffffff); // switches on the aerial-perspective haze (atmosphere.js)
+  const camera = new THREE.PerspectiveCamera(FOLLOW_HOME.fov, 1, 2, 60000);
 
-  // ---- terrain ---------------------------------------------------------
-  const { nx, ny, width, depth } = terrain;
-  const bytes = Uint8Array.from(atob(terrain.heights), c => c.charCodeAt(0));
-  const heights = new Uint16Array(bytes.buffer);
-  // Exact height of the rendered mesh (same triangle split as PlaneGeometry), so the road sits on it.
-  function elevation(x, z) {
-    const u = Math.max(0, Math.min(nx - 1.0001, (x / width + 0.5) * (nx - 1)));
-    const v = Math.max(0, Math.min(ny - 1.0001, (z / depth + 0.5) * (ny - 1)));
-    const a = Math.floor(u), b = Math.floor(v), fx = u - a, fy = v - b;
-    const h = (i, j) => heights[j * nx + i] / 10;
-    if (fx + fy <= 1) return h(a, b) + (h(a + 1, b) - h(a, b)) * fx + (h(a, b + 1) - h(a, b)) * fy;
-    return h(a + 1, b + 1) + (h(a, b + 1) - h(a + 1, b + 1)) * (1 - fx) + (h(a + 1, b) - h(a + 1, b + 1)) * (1 - fy);
-  }
-  const geom = new THREE.PlaneGeometry(width, depth, nx - 1, ny - 1);
-  geom.rotateX(-Math.PI / 2);
-  for (let i = 0; i < heights.length; i++) geom.attributes.position.setY(i, heights[i] / 10);
-  geom.computeVertexNormals();
-  // Terrain and sun never move, so cast shadows are baked once into vertex colours
-  // (a ray march over the height grid) instead of paying for a shadow map every frame.
-  {
-    const shade = new Float32Array(heights.length * 3), hf = Float32Array.from(heights, v => v / 10);
-    const cellX = width / (nx - 1), cellZ = depth / (ny - 1), hl = Math.hypot(SUN_DIR.x, SUN_DIR.z);
-    const STEP = 2; // grid cells per march step
-    const du = SUN_DIR.x / hl * STEP, dv = SUN_DIR.z / hl * STEP * cellX / cellZ, stepM = STEP * cellX, risePerStep = SUN_DIR.y / hl * stepM;
-    let top = 0;
-    for (const v of hf) top = Math.max(top, v);
-    for (let j = 0; j < ny; j++) {
-      if (j % 48 === 47) await breathe();
-      for (let i = 0; i < nx; i++) {
-        const k = j * nx + i, h0 = hf[k] + 2;
-        let margin = 1, u = i, v = j, ray = h0;
-        for (let s = 1; s < 90; s++) {
-          u += du; v += dv; ray += risePerStep;
-          if (u < 0 || v < 0 || u >= nx - 1 || v >= ny - 1 || ray > top) break;
-          const a = u | 0, b = v | 0, fx = u - a, fy = v - b, o = b * nx + a;
-          const h = (hf[o] * (1 - fx) + hf[o + 1] * fx) * (1 - fy) + (hf[o + nx] * (1 - fx) + hf[o + nx + 1] * fx) * fy;
-          margin = Math.min(margin, (ray - h) / (stepM * s));
-          if (margin < -0.05) break;
-        }
-        const lit = 0.42 + 0.58 * Math.min(1, Math.max(0, (margin + 0.03) / 0.09));
-        shade[k * 3] = lit; shade[k * 3 + 1] = lit; shade[k * 3 + 2] = Math.min(1, lit * 1.08);
-      }
-    }
-    geom.setAttribute('color', new THREE.BufferAttribute(shade, 3));
-  }
-  await breathe();
-  const groundMat = new THREE.MeshLambertMaterial({ color: 0x8d8a74, vertexColors: true });
-  // Fade the finite survey area into the haze so it never reads as a floating slab,
-  // and add fine procedural grain up close, where the 4.7 m/px imagery turns soft.
-  groundMat.onBeforeCompile = shader => {
-    shader.uniforms.uSize = { value: new THREE.Vector2(width, depth) };
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vEdgeUv;\nvarying vec2 vWorldXZ;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdgeUv = uv;\nvWorldXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
-        varying vec2 vEdgeUv; varying vec2 vWorldXZ; uniform vec2 uSize;
-        float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-          return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y); }`)
-      .replace('#include <map_fragment>', `#include <map_fragment>
-        float grain = vnoise(vWorldXZ * 0.31) * 0.5 + vnoise(vWorldXZ * 1.1) * 0.3 + vnoise(vWorldXZ * 0.08) * 0.2;
-        float near = 1.0 - smoothstep(120.0, 1100.0, length(vViewPosition));
-        diffuseColor.rgb *= mix(1.0, 0.8 + 0.4 * grain, near);`)
-      .replace('#include <fog_fragment>', `
-        vec2 edgeM = min(vEdgeUv, 1.0 - vEdgeUv) * uSize;
-        float edge = smoothstep(0.0, 1100.0, min(edgeM.x, edgeM.y));
-        gl_FragColor.rgb = mix(fogColor, gl_FragColor.rgb, edge); // fogColor is already in output space
-        #include <fog_fragment>`);
-  };
-  const ground = new THREE.Mesh(geom, groundMat);
+  // ---- terrain, sky and light ---------------------------------------------
+  const { width, depth } = terrain;
+  const { ground, elevation, textureReady } = await buildTerrain({ terrain, renderer, lite });
   scene.add(ground);
-  const textureReady = new Promise(resolve => new THREE.TextureLoader().load(terrain.texture, texture => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    groundMat.map = texture; groundMat.color.set(0xffffff); groundMat.needsUpdate = true;
-    resolve();
-  }, undefined, () => resolve()));
-
-  // ---- sky and light ---------------------------------------------------
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(40000, 32, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { uHaze: { value: HAZE }, uZenith: { value: ZENITH }, uSun: { value: SUN_DIR }, uSunTint: { value: SUN_TINT } },
-    vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position.z = gl_Position.w; }',
-    fragmentShader: `varying vec3 vDir; uniform vec3 uHaze, uZenith, uSun, uSunTint;
-      void main(){
-        float h = max(vDir.y, 0.0);
-        vec3 c = mix(uHaze, uZenith, pow(h, 0.55));
-        float s = max(dot(normalize(vDir), uSun), 0.0);
-        c += uSunTint * (pow(s, 8.0) * 0.35 + pow(s, 900.0) * 3.0);
-        gl_FragColor = vec4(min(c, vec3(1.0)), 1.0);
-        #include <colorspace_fragment>
-      }`,
-  }));
-  sky.material.toneMapped = false; // three applies fog after tone mapping; an untoned sky matches the fogged horizon
-  sky.frustumCulled = false;
-  scene.add(sky);
-  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x5a4a35, 1.15));
-  const sun = new THREE.DirectionalLight(0xffe2b8, 2.6);
+  await breathe();
+  const sky = createSky(), sea = createSea();
+  scene.add(sky, sea, createFarLand({ width, depth, elevation }));
+  scene.add(new THREE.HemisphereLight(0xc2d6ff, 0x6a5038, 1.7));
+  const sun = new THREE.DirectionalLight(SUN_COLOR, 5.2);
   sun.position.copy(SUN_DIR).multiplyScalar(9000);
   scene.add(sun, sun.target);
 
@@ -161,33 +86,44 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   for (let d = 0; d < len; d += 8) roadPts.push(roadPoint(d, new THREE.Vector3(), ROAD_LIFT));
   roadPts.push(roadPoint(len, new THREE.Vector3(), ROAD_LIFT));
   const gradeRGB = d => gradeColor(gradeAt(route, d)).map(v => (v / 255) ** 2.2);
-  {
-    // Flat asphalt ribbon with skirts (hide gaps on cross-slopes) and a centre stripe coloured by grade.
-    const ASPHALT = [0.045, 0.047, 0.05], across = [[-1, -4], [-1, 0], [-0.24, 0], [-0.2, 0], [0.2, 0], [0.24, 0], [1, 0], [1, -4]];
-    const stripe = [false, false, false, true, true, false, false, false], K = across.length;
-    const pos = new Float32Array(roadN * K * 3), col = new Float32Array(roadN * K * 3), idx = [];
+  // A strip along the road: `across` rows of [offset in road half-widths, height], one colour per row and point.
+  function strip(across, lift, color) {
+    const K = across.length, pos = new Float32Array(roadN * K * 3), col = new Float32Array(roadN * K * 4), idx = [];
     const p = new THREE.Vector3(), dir = new THREE.Vector3(), side = new THREE.Vector3();
     for (let k = 0; k < roadN; k++) {
       const d = Math.min(len, k * STEP);
-      roadPoint(d, p, ROAD_LIFT);
+      roadPoint(d, p, lift);
       side.crossVectors(roadDir(d, dir, 10), UP).normalize();
-      const c = gradeRGB(d);
       across.forEach(([s, dy], j) => {
         pos.set([p.x + side.x * s * ROAD_RADIUS, p.y + dy, p.z + side.z * s * ROAD_RADIUS], (k * K + j) * 3);
-        col.set(stripe[j] ? c : ASPHALT, (k * K + j) * 3);
+        col.set(color(d, j), (k * K + j) * 4);
       });
       if (k) for (let j = 0; j < K - 1; j++) { const a = (k - 1) * K + j, b = k * K + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
     }
-    const ribbon = new THREE.BufferGeometry();
-    ribbon.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    ribbon.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    ribbon.setIndex(idx);
-    ribbon.computeVertexNormals();
-    const road = new THREE.Mesh(ribbon, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-    scene.add(road);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    g.setIndex(idx);
+    return g;
+  }
+  {
+    // Asphalt with skirts (they hide gaps on cross-slopes) …
+    const ASPHALT = [0.05, 0.052, 0.056, 1];
+    const asphalt = strip([[-1, -4], [-1, 0], [1, 0], [1, -4]], ROAD_LIFT, () => ASPHALT);
+    asphalt.computeVertexNormals();
+    scene.add(new THREE.Mesh(asphalt, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    // … a glowing centre line coloured by grade (it blooms) …
+    const line = new THREE.Mesh(strip([[-0.22, 0], [0.22, 0]], ROAD_LIFT + 0.05, d => [...gradeRGB(d).map(v => v * 1.5), 1]),
+      new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    scene.add(line);
+    // … and a warm halo on the ground either side, so the route reads from the helicopter.
+    const halo = new THREE.Mesh(strip([[-2.8, 0], [-1, 0], [1, 0], [2.8, 0]], ROAD_LIFT + 0.1, (d, j) => [1, 0.72, 0.42, j === 1 || j === 2 ? 0.09 : 0]),
+      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
+    halo.renderOrder = 1;
+    scene.add(halo);
     // A 1 px line keeps the road visible from the far overview.
     const lineGeom = new THREE.BufferGeometry().setFromPoints(roadPts.map(q => q.clone().setY(q.y + 0.6)));
-    lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(roadPts.flatMap((_, i) => gradeRGB(i / (roadPts.length - 1) * len)), 3));
+    lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(roadPts.flatMap((_, i) => gradeRGB(i / (roadPts.length - 1) * len).map(v => v * 1.6)), 3));
     scene.add(new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ vertexColors: true, fog: false })));
   }
   scene.add(arch(0, 'START · CAIMARI', '#ffffff'), arch(len, 'FINISH · COLL DE SA BATALLA', '#ffd34d'));
@@ -216,6 +152,56 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     return g;
   }
 
+  // ---- kilometre boards and the summit flag ------------------------------------
+  const kmBoards = [];
+  for (let km = 1; km * 1000 < len - 300; km++) { // climb style: kilometres to the summit
+    const d = len - km * 1000, p = roadPoint(d, new THREE.Vector3()), side = new THREE.Vector3().crossVectors(roadDir(d), UP).normalize();
+    const c = document.createElement('canvas'); c.width = 256; c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(10,13,12,0.82)'; ctx.beginPath(); ctx.roundRect(4, 4, 248, 88, 44); ctx.fill();
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(48, 48, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '700 52px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${km} KM`, 78, 51);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    board.scale.set(16, 6, 1);
+    board.position.copy(p).addScaledVector(side, ROAD_RADIUS + 9).setY(p.y + 9);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 7, 6), new THREE.MeshLambertMaterial({ color: 0xe8e4da }));
+    post.position.copy(board.position).setY(p.y + 3);
+    scene.add(board, post);
+    kmBoards.push(board);
+  }
+  const summitRow = route.reduce((best, q) => q[2] > best[2] ? q : best);
+  const flag = (() => {
+    const d = summitRow[3], p = roadPoint(d, new THREE.Vector3()), side = new THREE.Vector3().crossVectors(roadDir(d), UP).normalize();
+    const foot = p.clone().addScaledVector(side, -(ROAD_RADIUS + 22));
+    foot.y = elevation(foot.x, foot.z);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 30, 8), new THREE.MeshLambertMaterial({ color: 0xdcd8cf }));
+    pole.position.copy(foot).setY(foot.y + 15);
+    // King-of-the-mountain polka dots
+    const c = document.createElement('canvas'); c.width = 256; c.height = 160;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 160);
+    ctx.fillStyle = '#e3262f';
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { ctx.beginPath(); ctx.arc(16 + x * 32 + (y % 2) * 16, 16 + y * 32, 9, 0, Math.PI * 2); ctx.fill(); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(14, 9, 14, 3).translate(7, 0, 0), new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide }));
+    cloth.position.copy(foot).setY(foot.y + 25);
+    cloth.rotation.y = Math.atan2(SUN_DIR.x, SUN_DIR.z) + Math.PI / 2; // streams across the light
+    const rest = Float32Array.from(cloth.geometry.attributes.position.array);
+    scene.add(pole, cloth);
+    return { cloth, rest };
+  })();
+  function waveFlag(t) {
+    const a = flag.cloth.geometry.attributes.position;
+    for (let k = 0; k < a.count; k++) {
+      const x = flag.rest[k * 3], y = flag.rest[k * 3 + 1];
+      a.setZ(k, Math.sin(x * 0.45 - t * 4.2 + y * 0.1) * x * 0.11);
+    }
+    a.needsUpdate = true;
+    flag.cloth.geometry.computeVertexNormals();
+  }
+
   await breathe();
   // ---- riders --------------------------------------------------------------
   const shared = {
@@ -225,7 +211,18 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     dark: new THREE.MeshLambertMaterial({ color: 0x15181b }),
     skin: new THREE.MeshLambertMaterial({ color: 0xc8916c }),
     shorts: new THREE.MeshLambertMaterial({ color: 0x15161a }),
+    shadow: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+    puck: new THREE.RingGeometry(0.42, 0.6, 40).rotateX(-Math.PI / 2),
   };
+  // A soft contact shadow, stretched away from the sun.
+  const shadowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const ctx = c.getContext('2d'), grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
+    grad.addColorStop(0, 'rgba(0,0,0,0.75)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
   const beamGeom = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true).translate(0, 0.5, 0);
   const beamShader = {
     vertexShader: 'varying float vY; void main(){ vY = uv.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
@@ -251,6 +248,15 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     const helmet = new THREE.Mesh(shared.head, jersey); helmet.position.set(0, 1.47, 0.37); helmet.scale.set(1, 0.9, 1.25); body.add(helmet);
     for (const s of [-1, 1]) bar(v(s * 0.17, 1.3, 0.26), v(s * 0.2, 0.95, 0.48), 0.04, shared.skin);
     const legs = [-1, 1].map(s => ({ s, thigh: limb(shared.shorts, 0.065), shin: limb(shared.skin, 0.045) }));
+    const shadow = new THREE.Mesh(shared.shadow, shadowMat);
+    shadow.scale.set(1.0, 1, 2.4);
+    shadow.renderOrder = 1;
+    body.add(shadow);
+    // A glowing puck in the rider's colour (it blooms), so a rider reads in a wide shot.
+    const puck = new THREE.Mesh(shared.puck, new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(2.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    puck.position.y = 0.03;
+    puck.renderOrder = 2;
+    body.add(puck);
     g.scale.setScalar(RIDER_SCALE);
     scene.add(g);
 
@@ -266,13 +272,13 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     const trailColors = new Float32Array(TRAIL_N * 2 * 4);
     for (let k = 0; k < TRAIL_N; k++) {
       const f = (1 - k / (TRAIL_N - 1)) ** 1.4;
-      for (const e of [0, 1]) trailColors.set([color.r, color.g, color.b, f], (k * 2 + e) * 4);
+      for (const e of [0, 1]) trailColors.set([color.r * 1.2, color.g * 1.2, color.b * 1.2, f], (k * 2 + e) * 4);
     }
     trailGeom.setAttribute('color', new THREE.BufferAttribute(trailColors, 4));
     const idx = [];
     for (let k = 0; k < TRAIL_N - 1; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
     trailGeom.setIndex(idx);
-    const trail = new THREE.Mesh(trailGeom, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    const trail = new THREE.Mesh(trailGeom, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false }));
     trail.renderOrder = 1;
     trail.frustumCulled = false;
     scene.add(trail);
@@ -286,7 +292,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     label.addEventListener('click', e => { e.stopPropagation(); onSelect(i); });
     labels.append(label);
 
-    return { g, body, legs, beam, trail, label, lane: (i - (race.riders.length - 1) / 2) * 0.22, phase: i * 1.7, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1) };
+    return { g, body, legs, beam, trail, label, shadow, puck, lane: (i - (race.riders.length - 1) / 2) * 0.22, phase: i * 1.7, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1) };
   });
 
   function placeBetween(mesh, a, b, r, keepScale = false) {
@@ -344,13 +350,17 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     follow: { ...FOLLOW_HOME },
     pov: { yaw: 0 },
     intro: null,
+    cine: false, // the auto camera directs: slower, eased moves
+    dolly: null, // { from, fromLook, t0, dur }: an eased move to the next shot
+    spinSign: 1, pushFloor: 0,
   };
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
-  let aspect = 1;
+  const velPos = new THREE.Vector3(), velLook = new THREE.Vector3(), subject = new THREE.Vector3();
+  let aspect = 1, fov = FOLLOW_HOME.fov, occlusionLift = 0;
 
   function overviewPose() {
     const portrait = aspect < 1;
-    Object.assign(rig.orbit, { radius: portrait ? 7600 : 5600, theta: portrait ? 0.32 : 0.95, phi: portrait ? 0.92 : 1.02 });
+    Object.assign(rig.orbit, { radius: portrait ? 8400 : 6400, theta: portrait ? 0.32 : 0.95, phi: portrait ? 0.95 : 1.04 });
     rig.orbit.target.copy(centre);
   }
   overviewPose();
@@ -359,11 +369,12 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     if (mode === 'overview') overviewPose();
     if (mode === 'free' && rig.mode !== 'overview') {
       rig.orbit.target.copy(riders[rig.selected].pos);
-      Object.assign(rig.orbit, { radius: 900, phi: 0.9 });
+      Object.assign(rig.orbit, { radius: 1100, phi: 0.9 });
     }
-    if (mode === 'follow') Object.assign(rig.follow, { ...FOLLOW_HOME });
+    if (mode === 'follow') rig.follow = { ...FOLLOW_HOME };
     rig.mode = mode;
     rig.intro = null;
+    rig.dolly = null;
     rig.transitionUntil = instant ? 0 : performance.now() + 1600;
   }
 
@@ -376,29 +387,72 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
 
   // The chase heading follows the road over 140 m and turns slowly, so hairpins do not whip the camera.
   let chaseHeading = null;
-  const chaseDir = new THREE.Vector3();
+  const chaseDir = new THREE.Vector3(), probe = new THREE.Vector3();
   function desiredPose(now, dt) {
     const r = riders[rig.selected];
     if (rig.mode === 'follow' || rig.mode === 'pov') {
-      const pov = rig.mode === 'pov';
+      const pov = rig.mode === 'pov', f = rig.follow;
       roadDir(currentD[rig.selected], chaseDir, pov ? 30 : 70);
       const target = Math.atan2(chaseDir.x, chaseDir.z);
       if (chaseHeading === null) chaseHeading = target;
       const delta = Math.atan2(Math.sin(target - chaseHeading), Math.cos(target - chaseHeading));
-      chaseHeading += delta * Math.min(1, dt * (pov ? 2.4 : 1.6));
+      chaseHeading += delta * Math.min(1, dt * (pov ? 2.4 : rig.cine ? 0.9 : 1.6));
+      // A broadcast shot drifts: a slow orbit, a slow push in.
+      if (!pov && f.spin) f.theta += f.spin * rig.spinSign * dt;
+      if (!pov && f.push) f.radius = Math.max(rig.pushFloor, f.radius * Math.exp(f.push * dt));
+      subject.copy(r.pos);
+      if (!pov && f.group) { // the riders within 300 m of the road around this one
+        let n = 1;
+        riders.forEach((o, i) => { if (i !== rig.selected && Math.abs(currentD[i] - currentD[rig.selected]) < 300) { subject.add(o.pos); n++; } });
+        subject.divideScalar(n);
+      }
       // Rider view is a low, tight chase just over the shoulder; drag swings it sideways.
-      const f = pov ? { theta: rig.pov.yaw, phi: 1.3, radius: 9 * RIDER_SCALE } : rig.follow, heading = chaseHeading + Math.PI + f.theta;
-      wantPos.set(
-        r.pos.x + f.radius * Math.sin(f.phi) * Math.sin(heading),
-        r.pos.y + f.radius * Math.cos(f.phi) + (pov ? 2.4 * RIDER_SCALE : 6),
-        r.pos.z + f.radius * Math.sin(f.phi) * Math.cos(heading));
-      const ahead = pov ? 40 : 45;
-      wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (pov ? 0.2 * RIDER_SCALE : 16), r.pos.z + Math.cos(chaseHeading) * ahead);
+      const g = pov ? { theta: rig.pov.yaw, phi: 1.3, radius: 9 * RIDER_SCALE } : f;
+      const place = (theta, out) => out.set(
+        subject.x + g.radius * Math.sin(g.phi) * Math.sin(chaseHeading + Math.PI + theta),
+        subject.y + g.radius * Math.cos(g.phi) + (pov ? 2.4 * RIDER_SCALE : 6),
+        subject.z + g.radius * Math.sin(g.phi) * Math.cos(chaseHeading + Math.PI + theta));
+      const ahead = pov ? 40 : f.ahead;
+      wantLook.set(subject.x + Math.sin(chaseHeading) * ahead, subject.y + (pov ? 0.2 * RIDER_SCALE : f.lift), subject.z + Math.cos(chaseHeading) * ahead);
+      if (pov) place(g.theta, wantPos);
+      else {
+        // Keep the riders in sight in the mountains: a ridge in the way first swings the camera
+        // sideways (a clear line nearby keeps the low, cinematic angle), then lifts it over.
+        if (now - swingAt > 400 && !pointers.size) {
+          swingAt = now;
+          let best = Infinity;
+          for (const off of SWINGS) {
+            const cost = liftFor(place(g.theta + off, probe)) + 260 * Math.abs(off) + (off === swingTarget ? -40 : 0);
+            if (cost < best) { best = cost; swingTarget = off; }
+          }
+        }
+        swing += (swingTarget - swing) * Math.min(1, dt * 0.7);
+        place(g.theta + swing, wantPos);
+        const need = liftFor(wantPos);
+        occlusionLift += (need - occlusionLift) * Math.min(1, dt * (need > occlusionLift ? 3 : 0.7));
+        wantPos.y += occlusionLift;
+      }
+      fovTarget = pov ? POV_FOV : f.fov ?? FOLLOW_HOME.fov;
     } else {
       if (rig.mode === 'overview' && now - rig.lastInput > 5000) rig.orbit.theta += 0.00004 * (now - lastNow);
       orbitPosition(rig.orbit, wantPos);
       wantLook.copy(rig.orbit.target);
+      fovTarget = MAP_FOV;
     }
+  }
+  let fovTarget = FOLLOW_HOME.fov, swing = 0, swingTarget = 0, swingAt = -1e9;
+  const SWINGS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05], sight = new THREE.Vector3();
+  // How far the camera at `pos` must rise for its line of sight to the subject to clear the ground.
+  function liftFor(pos) {
+    const sy = subject.y + 6;
+    let need = 0;
+    for (let s = 1; s <= 12; s++) {
+      const k = s / 13;
+      sight.lerpVectors(subject, pos, k);
+      const clear = elevation(sight.x, sight.z) + 12, lineY = sy + (pos.y - sy) * k;
+      if (clear > lineY) need = Math.max(need, sy + (clear - sy) / k - pos.y);
+    }
+    return need;
   }
 
   // ---- intro fly-over --------------------------------------------------------
@@ -411,16 +465,16 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       add(P(1), -1100, 820, -900),
       add(P(0.62), 900, 560, 250),
       add(P(0.3), -750, 520, 650),
-      start.clone().addScaledVector(dir0, -110).add(new THREE.Vector3(0, 125, 0)),
+      start.clone().addScaledVector(dir0, -280).add(new THREE.Vector3(0, 190, 0)),
     ];
-    const looks = [centre.clone(), P(1), P(0.48), P(0.12), start.clone().addScaledVector(dir0, 20)];
+    const looks = [centre.clone(), P(1), P(0.48), P(0.12), start.clone().addScaledVector(dir0, 30)];
     rig.intro = {
       t0: performance.now(), duration, onProgress, onDone,
       pos: new THREE.CatmullRomCurve3(positions, false, 'centripetal'),
       look: new THREE.CatmullRomCurve3(looks, false, 'centripetal'),
     };
     rig.mode = 'follow';
-    Object.assign(rig.follow, { ...FOLLOW_HOME });
+    rig.follow = { ...FOLLOW_HOME };
   }
   function skipIntro() {
     if (!rig.intro) return;
@@ -507,6 +561,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   canvas.addEventListener('wheel', e => { e.preventDefault(); if (rig.intro) return skipIntro(); rig.lastInput = performance.now(); zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
 
   function rotate(dx, dy) {
+    onUserCamera?.();
     if (rig.mode === 'follow') {
       rig.follow.theta -= dx * 0.006;
       rig.follow.phi = Math.max(0.35, Math.min(1.42, rig.follow.phi - dy * 0.005));
@@ -517,11 +572,13 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     }
   }
   function zoom(f) {
+    onUserCamera?.();
     if (rig.mode === 'follow') rig.follow.radius = Math.max(25, Math.min(1500, rig.follow.radius * f));
     else if (rig.mode === 'pov') { setMode('follow'); onModeChange?.('follow'); }
     else rig.orbit.radius = Math.max(120, Math.min(14000, rig.orbit.radius * f));
   }
   function pan(dx, dy) {
+    onUserCamera?.();
     if (rig.mode === 'overview') { rig.mode = 'free'; onModeChange?.('free'); }
     const k = rig.orbit.radius * 0.0016, s = Math.sin(rig.orbit.theta), c = Math.cos(rig.orbit.theta);
     rig.orbit.target.x -= (dx * c + dy * s) * k;
@@ -529,7 +586,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     rig.orbit.target.y = elevation(rig.orbit.target.x, rig.orbit.target.z);
   }
   function doubleTap(e) {
-    if (rig.mode === 'follow') { Object.assign(rig.follow, { ...FOLLOW_HOME }); return; }
+    onUserCamera?.();
+    if (rig.mode === 'follow') { rig.follow = { ...FOLLOW_HOME }; return; }
     const rect = canvas.getBoundingClientRect();
     ndc.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
@@ -541,25 +599,68 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     rig.transitionUntil = performance.now() + 1200;
     onModeChange?.('free');
   }
-  let onModeChange = null;
+  let onModeChange = null, onUserCamera = null;
+
+  // A broadcast shot for the auto camera: one of the modes, or a follow-rig preset (`side` picks the left or right moto).
+  // The camera moves to it in one slow eased dolly; a move across the map would be a fly-by, so that one is a cut
+  // instead, and setShot returns 'cut' for the page to dip the picture.
+  function setShot(shot, side = 1) {
+    const from = camPos.clone(), fromLook = camLook.clone();
+    if (!SHOTS[shot]) setMode(shot);
+    else {
+      setMode('follow');
+      rig.follow = { ...SHOTS[shot], theta: SHOTS[shot].theta * side };
+      rig.spinSign = side;
+      rig.pushFloor = SHOTS[shot].radius * 0.6;
+    }
+    chaseHeading = null;
+    occlusionLift = swing = swingTarget = 0; swingAt = -1e9;
+    desiredPose(performance.now(), 0);
+    velPos.set(0, 0, 0); velLook.set(0, 0, 0);
+    if (from.distanceTo(wantPos) > 2200 && wantLook.distanceTo(fromLook) > 900) {
+      camPos.copy(wantPos); camLook.copy(wantLook);
+      fov = fovTarget;
+      rig.transitionUntil = 0;
+      return 'cut';
+    }
+    rig.dolly = { from, fromLook, t0: performance.now(), dur: 2800 + Math.min(1800, from.distanceTo(wantPos) * 0.8) };
+    return 'dolly';
+  }
+
+  // Critically damped spring (no overshoot, no jerk): the camera glides to its target.
+  const dv = new THREE.Vector3(), dt2 = new THREE.Vector3();
+  function smoothDamp(cur, target, vel, smooth, dt) {
+    const omega = 2 / smooth, x = omega * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    dv.subVectors(cur, target);
+    dt2.copy(vel).addScaledVector(dv, omega).multiplyScalar(dt);
+    vel.addScaledVector(dt2, -omega).multiplyScalar(e);
+    cur.copy(target).add(dv.add(dt2).multiplyScalar(e));
+  }
 
   // ---- frame ----------------------------------------------------------------
   const currentD = race.riders.map(() => 0);
   const project = new THREE.Vector3(), trailP = new THREE.Vector3(), trailS = new THREE.Vector3();
   let lastNow = performance.now(), slowFrames = 0, frames = 0, w = 1, h = 1, insetRight = 0, lastKey = '';
+  const post = createPost(renderer, scene, camera, { quality: lite ? 'low' : 'high' });
+  const sunAway = new THREE.Vector2(-SUN_DIR.x, -SUN_DIR.z).normalize();
 
   // A right-hand panel (desktop) covers part of the canvas: shift the centre of
   // projection so the subject sits in the middle of the visible area.
   function resize() {
     w = container.clientWidth; h = container.clientHeight;
     aspect = (w - insetRight) / h;
-    camera.fov = aspect < 0.8 ? 62 : 48;
     camera.aspect = (w + insetRight) / h;
     if (insetRight) camera.setViewOffset(w + insetRight, h, insetRight, 0, w, h);
     else camera.clearViewOffset();
-    camera.updateProjectionMatrix();
+    applyFov();
     renderer.setSize(w, h, false);
+    post.setSize(w, h);
     if (rig.mode === 'overview') overviewPose();
+  }
+  // A portrait screen gets a taller field, so the horizontal framing stays close to landscape's.
+  function applyFov() {
+    camera.fov = fov * (aspect < 0.8 ? 1.3 : 1);
+    camera.updateProjectionMatrix();
   }
   new ResizeObserver(resize).observe(container);
   resize();
@@ -567,13 +668,16 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   function frame({ time, distances, playing, rate }) {
     const now = performance.now();
     const realDt = Math.min(0.1, (now - lastNow) / 1000);
-    // Adaptive resolution: step pixel ratio down if the phone cannot hold ~45 fps.
+    // Adaptive quality: if the phone cannot hold ~45 fps, drop the bloom first, then the pixel ratio.
     frames++;
     if (realDt > 0.024) slowFrames++;
     if (frames === 30) {
-      if (slowFrames > 15 && dpr > 0.75) { dpr = Math.max(0.75, dpr - (slowFrames > 25 ? 0.5 : 0.25)); renderer.setPixelRatio(dpr); resize(); }
+      if (slowFrames > 15 && !post.lower() && dpr > 0.75) { dpr = Math.max(0.75, dpr - (slowFrames > 25 ? 0.5 : 0.25)); renderer.setPixelRatio(dpr); resize(); }
       frames = slowFrames = 0;
     }
+    const t = now / 1000;
+    sky.material.uniforms.uTime.value = t;
+    sea.material.uniforms.uTime.value = t;
 
     riders.forEach((r, i) => {
       const d = distances[i], moving = playing && d < len && d > 0;
@@ -582,21 +686,27 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       const side = tmpA.crossVectors(r.dir, UP).normalize();
       roadPoint(d, r.pos, ROAD_LIFT).addScaledVector(side, r.lane * RIDER_SCALE);
       r.g.position.copy(r.pos);
-      r.g.rotation.set(0, Math.atan2(r.dir.x, r.dir.z), 0);
+      const yaw = Math.atan2(r.dir.x, r.dir.z);
+      r.g.rotation.set(0, yaw, 0);
       r.body.rotation.x = -Math.asin(Math.max(-0.3, Math.min(0.3, r.dir.y)));
       if (moving) r.phase += realDt * Math.min(1.45 * rate, 2.3) * Math.PI * 2;
       if (moving || r.posedAt !== d) { pedal(r); r.posedAt = d; }
+      // the contact shadow falls away from the sun (rotate the world direction into the rider's frame)
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      r.shadow.position.set((sunAway.x * cy - sunAway.y * sy) * 0.55, 0.02, (sunAway.x * sy + sunAway.y * cy) * 0.55);
+      r.shadow.rotation.y = Math.atan2(sunAway.x * cy - sunAway.y * sy, sunAway.x * sy + sunAway.y * cy);
 
       const camDist = camera.position.distanceTo(r.pos), sel = i === rig.selected;
-      r.g.visible = camDist < 2500; // LOD: far away the beam and label carry the rider, the jointed model is skipped
-      const bh = Math.max(18, camDist * (sel ? 0.12 : 0.085)), bw = Math.max(0.6, camDist * (sel ? 0.0026 : 0.0018));
+      r.g.visible = camDist < 3200; // LOD: far away the beam and label carry the rider, the jointed model is skipped
+      r.puck.material.opacity = (sel ? 0.75 + 0.25 * Math.sin(t * 4) : 0.55) * Math.min(1, Math.max(0, (camDist - 60) / 200)); // a marker for wide shots, gone up close
+      const bh = Math.max(18, camDist * (sel ? 0.1 : 0.07)), bw = Math.max(0.6, camDist * (sel ? 0.0022 : 0.0015));
       r.beam.position.copy(r.pos);
       r.beam.scale.set(bw, bh, bw);
-      r.beam.material.uniforms.uAlpha.value = Math.min(0.95, camDist / 600) * (sel ? 1 : 0.7);
+      r.beam.material.uniforms.uAlpha.value = Math.min(0.9, camDist / 700) * (sel ? 1 : 0.65);
       r.beam.visible = !(rig.mode === 'pov' && i === rig.selected);
 
       const half = Math.max(0.9, Math.min(9, camDist * 0.002)), trailKey = `${d}:${half.toFixed(1)}`;
-      r.trail.material.opacity = sel ? 1 : 0.4;
+      r.trail.material.opacity = sel ? 1 : 0.45;
       if (r.trailKey === trailKey) return; // trail only rebuilds when the rider or the zoom moved
       r.trailKey = trailKey;
       const pos = r.trail.geometry.attributes.position;
@@ -614,22 +724,41 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       const u = Math.min(1, (now - rig.intro.t0) / rig.intro.duration), e = u < 0.5 ? 4 * u ** 3 : 1 - (-2 * u + 2) ** 3 / 2;
       rig.intro.pos.getPoint(e, camPos);
       rig.intro.look.getPoint(e, camLook);
+      fovTarget = 44;
       rig.intro.onProgress?.(u);
       if (u >= 1) skipIntro();
     } else {
       desiredPose(now, realDt);
-      const transition = now < rig.transitionUntil, dragging = pointers.size > 0;
-      const lambda = transition ? 2.6 : dragging ? 14 : rig.mode === 'follow' ? 5 : rig.mode === 'pov' ? 7 : 6;
-      const k = 1 - Math.exp(-realDt * lambda);
-      camPos.lerp(wantPos, k);
-      camLook.lerp(wantLook, Math.min(1, k * 1.4));
-      if (rig.mode === 'pov' && !dragging) rig.pov.yaw *= 1 - Math.min(1, realDt * 1.5);
+      const dragging = pointers.size > 0;
+      if (rig.dolly) {
+        // An eased dolly to the live target, lifted a little mid-move like a crane.
+        const u = Math.min(1, (now - rig.dolly.t0) / rig.dolly.dur), e = u * u * u * (u * (u * 6 - 15) + 10);
+        camPos.lerpVectors(rig.dolly.from, wantPos, e);
+        camPos.y += Math.sin(Math.PI * u) * Math.min(260, rig.dolly.from.distanceTo(wantPos) * 0.2);
+        camLook.lerpVectors(rig.dolly.fromLook, wantLook, Math.min(1, e * 1.15));
+        if (u >= 1 || dragging) { rig.dolly = null; velPos.set(0, 0, 0); velLook.set(0, 0, 0); }
+      } else {
+        const transition = now < rig.transitionUntil;
+        const smooth = dragging ? 0.07 : transition ? 0.5 : rig.cine ? 0.8 : rig.mode === 'pov' ? 0.22 : rig.mode === 'follow' ? 0.32 : 0.28;
+        smoothDamp(camPos, wantPos, velPos, smooth, realDt);
+        smoothDamp(camLook, wantLook, velLook, smooth * 0.75, realDt);
+        if (rig.mode === 'pov' && !dragging) rig.pov.yaw *= 1 - Math.min(1, realDt * 1.5);
+      }
     }
+    fov += (fovTarget - fov) * Math.min(1, realDt * (rig.dolly ? 1.2 : 2.5));
+    if (Math.abs(camera.fov - fov * (aspect < 0.8 ? 1.3 : 1)) > 0.01) applyFov();
     camPos.y = Math.max(camPos.y, elevation(camPos.x, camPos.z) + (rig.mode === 'pov' ? 6 : 14));
     camera.position.copy(camPos);
     camera.lookAt(camLook);
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
+    sea.position.set(camera.position.x, 0, camera.position.z);
+    if (camera.position.distanceTo(flag.cloth.position) < 3000) waveFlag(t);
+    for (const b of kmBoards) {
+      const d = camera.position.distanceTo(b.position);
+      b.material.opacity = Math.min(1, (2400 - d) / 600) * Math.min(1, (d - 30) / 60);
+      b.visible = b.material.opacity > 0.01;
+    }
 
     // HTML labels follow their 3D anchors.
     riders.forEach((r, i) => {
@@ -655,8 +784,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     }
 
     // Render on demand: a paused, settled view costs nothing.
-    const key = `${camera.position.x.toFixed(2)},${camera.position.y.toFixed(2)},${camera.position.z.toFixed(2)},${camLook.x.toFixed(2)},${camLook.z.toFixed(2)},${time},${rig.selected},${w},${h},${dpr}`;
-    if (key !== lastKey || playing || rig.intro) { renderer.render(scene, camera); lastKey = key; }
+    const key = `${camera.position.x.toFixed(2)},${camera.position.y.toFixed(2)},${camera.position.z.toFixed(2)},${camLook.x.toFixed(2)},${camLook.z.toFixed(2)},${camera.fov.toFixed(2)},${time},${rig.selected},${w},${h},${dpr},${post.quality}`;
+    if (key !== lastKey || playing || rig.intro) { post.render(); lastKey = key; }
     lastNow = now;
   }
 
@@ -665,12 +794,14 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   textureReady.then(() => { lastKey = ''; });
 
   return {
-    frame, setMode, startIntro, skipIntro, addPin,
+    frame, setMode, setShot, startIntro, skipIntro, addPin,
     // Ready once imagery is decoded and shaders are compiled (in parallel where the GPU allows).
     ready: textureReady.then(() => renderer.extensions.has('KHR_parallel_shader_compile') && renderer.compileAsync(scene, camera)).catch(() => {}),
     get introRunning() { return !!rig.intro; },
     select(i) { rig.selected = i; },
+    setCinematic(on) { rig.cine = on; if (!on) rig.dolly = null; },
     onModeChange(fn) { onModeChange = fn; },
+    onUserCamera(fn) { onUserCamera = fn; },
     setInsetRight(px) { if (px !== insetRight) { insetRight = px; resize(); } },
   };
 }

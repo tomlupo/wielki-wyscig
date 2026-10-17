@@ -40,7 +40,16 @@ svg { display: block; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
 .stage .fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
 .stage::after { content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to bottom, rgba(8, 11, 10, 0.55), transparent 24%, transparent 62%, rgba(8, 11, 10, 0.5)); }
+  background: radial-gradient(130% 95% at 50% 48%, transparent 58%, rgba(6, 8, 10, 0.42)),
+    linear-gradient(to bottom, rgba(8, 11, 10, 0.55), transparent 24%, transparent 62%, rgba(8, 11, 10, 0.5)); }
+/* Letterbox bars while the TV director has the camera — on wide screens only; on a portrait
+   phone the header and the sheet already frame the picture. */
+.stage::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-block: 0 solid #050706; transition: border-width 0.9s cubic-bezier(0.4, 0, 0.2, 1); }
+@media (min-aspect-ratio: 1/1) { .app.auto[data-phase='race'] .stage::before { border-block-width: 6svh; } }
+/* A cut: the picture comes up from black. */
+.stage.dip canvas { animation: dip 0.55s ease-out; }
+@keyframes dip { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .stage::before { transition: none; } .stage.dip canvas { animation: none; } }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
 .rlabel { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px 0 3px;
   translate: -50% calc(-100% - 7px); border-radius: 13px; background: var(--glass-strong); box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 6px 18px rgba(0, 0, 0, 0.35);
@@ -98,8 +107,8 @@ svg { display: block; }
 .fnav svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- camera buttons ----------------------------------------------------------- */
-.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 196px); display: flex; flex-direction: column; gap: 8px; }
-.cams button { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); position: relative; transition: background 0.2s, color 0.2s, transform 0.15s; }
+.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 202px); display: flex; flex-direction: column; gap: 6px; }
+.cams button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); position: relative; transition: background 0.2s, color 0.2s, transform 0.15s; }
 .cams button:active { transform: scale(0.94); }
 .cams svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .cams span { display: none; }
@@ -111,7 +120,9 @@ svg { display: block; }
   background: rgba(13, 17, 15, 0.86); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
   transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.25, 1); will-change: transform; overflow: hidden; }
-.sheet[data-snap='full'] { overflow-y: auto; overscroll-behavior: contain; }
+/* The handle, player bar and scrubber stay put; everything under them scrolls with one finger in any snap. */
+.sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .grab { flex: none; height: 22px; display: grid; place-items: center; touch-action: none; cursor: grab; }
 .grab span { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.28); }
 .transport { flex: none; display: flex; align-items: center; gap: 10px; touch-action: none; }
@@ -138,7 +149,7 @@ svg { display: block; }
 .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--rider) 40%, transparent), 0 2px 8px rgba(0, 0, 0, 0.5); }
 .scrub::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--rider) 40%, transparent); }
 
-.profile { flex: none; margin: 2px -4px 0; }
+.profile { flex: none; margin: 16px -4px 0; }
 .profile svg { width: 100%; height: 76px; overflow: visible; touch-action: none; }
 .p-area { opacity: 0.55; }
 .p-line { fill: none; stroke: rgba(255, 255, 255, 0.75); stroke-width: 1.4; }
@@ -235,26 +246,29 @@ svg { display: block; }
 .intro-cap { position: absolute; left: var(--gutter); right: var(--gutter); bottom: calc(var(--safe-b) + 108px); text-align: center; font: 700 24px/1.1 var(--num); text-transform: uppercase; letter-spacing: 0.08em; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7); opacity: 0; transform: translateY(8px); }
 .intro-cap.in { animation: cap 2.6s both; }
 @keyframes cap { 0% { opacity: 0; transform: translateY(8px); } 18%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
-.skip { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 36px); translate: -50% 0; pointer-events: auto; height: 44px; padding: 0 20px; border-radius: 22px; background: var(--glass); border: 1px solid var(--line); font: 600 13px/1 var(--num); letter-spacing: 0.18em; text-transform: uppercase; }
+.skip { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 36px); translate: -50% 0; pointer-events: none; height: 44px; padding: 0 20px; border-radius: 22px; background: var(--glass); border: 1px solid var(--line); font: 600 13px/1 var(--num); letter-spacing: 0.18em; text-transform: uppercase; }
+/* Only while the intro plays: invisible after it, the button would sit on the sheet and take its swipes. */
+[data-phase='intro'] .skip { pointer-events: auto; }
 .go { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; pointer-events: none; font: 700 clamp(90px, 30vw, 200px)/1 var(--num); text-transform: uppercase; color: var(--gold); text-shadow: 0 6px 40px rgba(0, 0, 0, 0.5); opacity: 0; }
 .go.in { animation: go 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes go { 0% { opacity: 0; transform: scale(0.6); } 25% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(1.35); } }
 
-.podium { position: absolute; z-index: 7; inset: 0; display: grid; place-items: center; padding: calc(var(--safe-t) + 20px) var(--gutter) calc(var(--safe-b) + 20px); background: rgba(5, 8, 7, 0.55); backdrop-filter: blur(4px); animation: fade 0.4s both; }
-@keyframes fade { from { opacity: 0; } }
-.podium-card { width: min(440px, 100%); padding: 22px 20px 18px; border-radius: 22px; background: var(--glass-strong); border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-@keyframes rise { from { transform: translateY(30px); opacity: 0; } }
-.podium h2 { margin: 8px 0 14px; font: 700 30px/1 var(--num); text-transform: uppercase; }
-.podium ol { margin: 0; padding: 0; list-style: none; }
-.podium li { display: grid; grid-template-columns: 22px 28px 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font: 600 17px/1 var(--num); font-variant-numeric: tabular-nums; }
-.podium li:first-child { color: var(--gold); }
-.podium li:first-child .pos::before { content: '★ '; font-size: 12px; }
-.podium .pos { color: var(--dim); }
-.podium .nm { text-transform: uppercase; letter-spacing: 0.03em; }
-.podium .gap { color: var(--dim); min-width: 58px; text-align: right; }
-.podium-actions { display: flex; gap: 10px; margin-top: 16px; }
-.podium-actions button { flex: 1; height: 48px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); font: 700 16px/1 var(--num); letter-spacing: 0.14em; text-transform: uppercase; }
-.podium-actions .primary { background: var(--ink); color: #111; }
+.card { position: absolute; z-index: 7; inset: 0; display: grid; place-items: center; padding: calc(var(--safe-t) + 16px) var(--gutter) calc(var(--safe-b) + 16px); background: rgba(5, 8, 7, 0.7); backdrop-filter: blur(4px); animation: fade 0.4s both; }
+.card-box { position: relative; width: min(440px, 100%, (100svh - 120px) * 0.8); animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.card canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); background: #0e1412; }
+.card-actions { display: flex; gap: 8px; margin-top: 12px; }
+.card-actions button { flex: 1; height: 48px; border-radius: 14px; background: var(--glass-strong); border: 1px solid var(--line); font: 700 15px/1 var(--num); letter-spacing: 0.12em; text-transform: uppercase; }
+.card-actions .primary { background: var(--ink); color: #111; border-color: transparent; }
+.card-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, 0.45); }
+.card-close svg { width: 20px; height: 20px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+.events li button.results { grid-template-columns: 44px 20px 1fr; }
+/* The auto camera's lower third: one line over the picture, bottom left, like a TV caption. */
+.tv-cap { position: absolute; z-index: 3; left: calc(var(--safe-l) + var(--gutter)); bottom: calc(var(--sheet-visible) + 14px); max-width: calc(100% - 2 * var(--gutter) - 60px);
+  padding: 8px 14px 8px 12px; border-left: 4px solid var(--cap, var(--rider)); border-radius: 4px 10px 10px 4px; background: var(--glass-strong);
+  font: 700 17px/1.15 var(--num); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0; translate: -12px 0; pointer-events: none; transition: opacity 0.45s, translate 0.45s, left 0.3s; }
+.tv-cap.in { opacity: 1; translate: 0 0; }
+.app.pip-on .tv-cap { left: calc(var(--safe-l) + var(--gutter) + 104px); }
+.cams button[data-cam='auto'][aria-pressed='true'] { background: var(--gold); }
 
 .loader { position: absolute; z-index: 8; inset: 0; display: grid; place-items: center; background: radial-gradient(100% 70% at 50% 30%, #1d2a24, #0b0f0d 70%); transition: opacity 0.8s, visibility 0.8s; }
 .app:not([data-phase='loading']):not([data-phase='error']) .loader { opacity: 0; visibility: hidden; }
@@ -286,7 +300,14 @@ svg { display: block; }
 }
 @media (max-height: 640px) and (max-width: 959px) {
   .focus .stats { display: none; }
-  .cams { top: calc(var(--safe-t) + 136px); }
+  .cams { top: calc(var(--safe-t) + 142px); }
+}
+/* Landscape phones: no height for a column, so the rail is a row on the right, just above the sheet. */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 959px) {
+  .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
+  .cams button { width: 40px; height: 40px; border-radius: 12px; }
+  .cams svg { width: 20px; height: 20px; }
+  .tv-cap { max-width: calc(100% - 2 * var(--gutter) - 240px); }
 }
 
 /* ---- desktop ------------------------------------------------------------------------- */
@@ -310,6 +331,8 @@ svg { display: block; }
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); animation: fade 0.2s both; }
   .rlabel { cursor: pointer; }
   .pip { bottom: calc(var(--gutter) + 150px); width: 120px; } /* above the rider card */
+  .tv-cap { bottom: calc(var(--gutter) + 160px); font-size: 20px; }
+  .app.pip-on .tv-cap { left: calc(var(--safe-l) + var(--gutter) + 136px); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

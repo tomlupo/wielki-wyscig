@@ -5,6 +5,8 @@ import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
 import { loadRace } from './data/source.js';
 import { renderProfile, createCharts } from './charts.js';
 import { deriveEvents } from './events.js';
+import { createDirector } from './director.js';
+import { drawCard } from './card.js';
 import mediaData from '../data/media.json';
 
 const $ = id => document.getElementById(id);
@@ -63,7 +65,13 @@ async function boot() {
   const initial = parseState(location.search, { riderIds: riders.map(r => r.id), duration });
   let time = initial.t, speed = initial.speed, playing = false, finishedShown = false;
   let selected = Math.max(0, riders.findIndex(r => r.id === initial.rider));
-  let camMode = initial.cam;
+  let camMode = initial.cam === 'auto' ? 'follow' : initial.cam, auto = false;
+  // The TV director's moves: race events, plus the video moments (cut there before the clip pops up).
+  const director = createDirector({
+    targets: [...events, ...moments.map(m => ({ t: m.t, type: 'media', rider: m.rider, score: 60 }))].sort((a, b) => a.t - b.t),
+    order: t => standings(riders, t).map(row => row.index),
+    names: riders.map(r => r.name),
+  });
 
   // ---- static text --------------------------------------------------------
   const km = (stats.length / 1000).toFixed(1);
@@ -110,6 +118,10 @@ async function boot() {
     $('events-list').append(li);
     return li;
   });
+  const resultsItem = document.createElement('li');
+  resultsItem.innerHTML = '<button class="results"><time></time><span aria-hidden="true">🏁</span><span>Results</span></button>';
+  resultsItem.querySelector('button').addEventListener('click', () => { closeEvents(); showCard(); });
+  $('events-list').append(resultsItem);
   const eventsBox = $('events'), eventsBtn = $('events-btn');
   function openEvents() {
     eventItems.forEach((li, k) => li.classList.toggle('past', listed[k].t < time));
@@ -130,6 +142,7 @@ async function boot() {
   // Start a little before the move (about two seconds of playback at the current speed), on the rider who made it.
   function jumpTo(e) {
     closeEvents();
+    autoOff();
     followRider(e.rider);
     seek(e.t - Math.min(60, Math.max(5, 2 * speed)));
     pushState(true);
@@ -145,11 +158,13 @@ async function boot() {
     pipVideo.src = m.src; pipVideo.poster = m.poster ?? '';
     pip.hidden = false;
     requestAnimationFrame(() => pip.classList.add('in'));
+    app.classList.add('pip-on');
     pipVideo.play().catch(() => hidePip());
   }
   function hidePip() {
     if (pip.hidden) return;
     pip.classList.remove('in');
+    app.classList.remove('pip-on');
     pipVideo.pause();
     setTimeout(() => { if (!pip.classList.contains('in')) pip.hidden = true; }, 400);
   }
@@ -159,6 +174,7 @@ async function boot() {
   function openMoment(m) {
     closeEvents();
     hidePip();
+    autoOff();
     followRider(m.rider);
     seek(m.t);
     resumeAfterClip = playing;
@@ -192,6 +208,7 @@ async function boot() {
     const { createWorld } = await worldModule;
     world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y) });
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
+    world.onUserCamera(() => live && autoOff());
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
   } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
   if (!world) {
@@ -215,19 +232,56 @@ async function boot() {
   }
   // Picking a rider from the board or a 3D label: keep a rider camera, leave the map views for Follow.
   function followRider(i) {
+    autoOff();
     select(i);
     if (camMode !== 'pov') setCam('follow');
   }
   function setCam(mode) {
+    if (mode === 'auto') return setAuto(!auto);
     if (!world || !CAMERAS.includes(mode)) return;
     if (world.introRunning) world.skipIntro(); // ends the intro through its onDone, so the race still starts
+    auto = false;
     camMode = mode;
     world.setMode(mode);
     syncCams();
     pushState(true);
   }
   function syncCams() {
-    for (const b of $('cams').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.cam === camMode));
+    for (const b of $('cams').querySelectorAll('button')) b.setAttribute('aria-pressed', String(auto ? b.dataset.cam === 'auto' : b.dataset.cam === camMode));
+  }
+  // ---- auto "TV" camera: the director cuts; any manual camera or rider choice hands control back ----
+  function setAuto(on) {
+    if (!world || on === auto) return;
+    auto = on;
+    world.setCinematic(on);
+    app.classList.toggle('auto', on); // letterbox bars while the director has the camera
+    if (on) cutTo(director.start(time, performance.now() / 1000));
+    syncCams();
+    pushState(true);
+  }
+  function autoOff() { if (auto) setAuto(false); }
+  function cutTo(c) {
+    select(c.rider);
+    if (world.setShot(c.shot, c.side) === 'cut') dip();
+    camMode = CAMERAS.includes(c.shot) ? c.shot : 'follow';
+    syncCams();
+    if (c.caption) lowerThird(c.caption, riders[c.rider].color);
+  }
+  // A long move is a cut, not a fly-by: dip the picture so it reads as one.
+  function dip() {
+    const stage = $('stage');
+    stage.classList.remove('dip'); void stage.offsetWidth;
+    stage.classList.add('dip');
+  }
+  let capTimer = 0;
+  function lowerThird(message, color) {
+    const el = $('tv-cap');
+    el.style.setProperty('--cap', color);
+    el.classList.remove('in'); void el.offsetWidth;
+    el.textContent = message;
+    el.classList.add('in');
+    clearTimeout(capTimer);
+    capTimer = setTimeout(() => el.classList.remove('in'), 3200);
   }
   function setPlaying(on) {
     if (on && time >= duration) { time = 0; finishedShown = false; }
@@ -252,8 +306,8 @@ async function boot() {
     void focus.offsetWidth;
     focus.classList.add(dir > 0 ? 'slide-next' : 'slide-prev');
   }
-  $('f-prev').addEventListener('click', () => stepRider(-1));
-  $('f-next').addEventListener('click', () => stepRider(1));
+  $('f-prev').addEventListener('click', () => { autoOff(); stepRider(-1); });
+  $('f-next').addEventListener('click', () => { autoOff(); stepRider(1); });
   let swipe = null;
   focus.addEventListener('pointerdown', e => {
     if (e.target.closest('button')) return;
@@ -270,7 +324,7 @@ async function boot() {
     const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
     swipe = null;
     focus.style.removeProperty('--drag');
-    if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) stepRider(dx < 0 ? 1 : -1);
+    if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { autoOff(); stepRider(dx < 0 ? 1 : -1); }
   };
   focus.addEventListener('pointerup', endSwipe);
   focus.addEventListener('pointercancel', endSwipe);
@@ -290,17 +344,20 @@ async function boot() {
       else { await navigator.clipboard.writeText(url); toast('Link copied — it opens at this moment.'); }
     } catch (error) { if (error?.name !== 'AbortError') toast(url); }
   });
-  $('replay').addEventListener('click', () => { $('podium').hidden = true; setPlaying(true); });
-  $('podium-close').addEventListener('click', () => { $('podium').hidden = true; });
+  $('replay').addEventListener('click', () => { resumeAfterCard = false; closeCard(); seek(0); setPlaying(true); });
+  $('card-close').addEventListener('click', closeCard);
+  $('card').addEventListener('click', e => { if (e.target === $('card')) closeCard(); });
   addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('card').hidden) return closeCard();
     if (e.key === 'Escape' && !clip.hidden) return closeClip();
     if (e.key === 'Escape' && !eventsBox.hidden) return closeEvents();
     if (e.target.closest('input,select,textarea') && e.key !== ' ') return;
     if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === 'ArrowRight') seek(time + 15);
     else if (e.key === 'ArrowLeft') seek(time - 15);
-    else if (e.key === ']') stepRider(1);
-    else if (e.key === '[') stepRider(-1);
+    else if (e.key === ']') { autoOff(); stepRider(1); }
+    else if (e.key === '[') { autoOff(); stepRider(-1); }
+    else if (e.key === 'a') setAuto(!auto);
     else if (/^[1-4]$/.test(e.key)) setCam(CAMERAS[e.key - 1]);
   });
 
@@ -313,7 +370,8 @@ async function boot() {
   let snap = 'peek', sheetY = 0, dragStart = null;
   function snapHeights() {
     const top = sheet.getBoundingClientRect().top - sheetY;
-    const peek = $('standings-title').getBoundingClientRect().top - sheetY - top;
+    // Peek shows the player bar only: it ends under the scrubber, above the sheet's own bottom padding.
+    const peek = sheet.querySelector('.scrub-wrap').getBoundingClientRect().bottom - sheetY - top + parseFloat(getComputedStyle(sheet).paddingBottom);
     const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
     return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }
@@ -328,7 +386,11 @@ async function boot() {
     sheet.dataset.snap = name;
     world?.setInsetRight(desktop.matches ? innerWidth - sheet.offsetLeft : 0);
     if (desktop.matches) return placeSheet(0, false);
+    // Below full the content does not scroll: back to its top, where the half snap expects the standings.
+    if (name !== 'full') $('sheet-body').scrollTop = 0;
     const h = snapHeights();
+    // On a short screen the standings do not fit in half: the sheet opens full, where the content scrolls.
+    if (name === 'half' && h.half >= h.full - 1) snap = sheet.dataset.snap = name = 'full';
     placeSheet(sheet.offsetHeight - h[name], animate);
   }
   function dragBegin(y) { dragStart = { y, sheetY, t: performance.now(), moved: false }; }
@@ -345,9 +407,9 @@ async function boot() {
     dragStart = null;
     const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
     if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
-    const order = ['peek', 'half', 'full'];
+    const order = h.half >= h.full - 1 ? ['peek', 'full'] : ['peek', 'half', 'full'];
     let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
-    if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
+    if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(order.length - 1, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
     setSnap(target);
   }
   const grabZone = [$('grab'), $('transport')];
@@ -361,6 +423,32 @@ async function boot() {
     el.addEventListener('pointerup', e => dragEnd(e.clientY));
     el.addEventListener('pointercancel', dragCancel);
   }
+  // The content under the scrubber scrolls natively once the sheet is fully open. Until then its bottom is off
+  // screen, so a swipe there moves the sheet; when full, so does a pull down from the top of the content.
+  // The direction of the first move decides: after it, a browser no longer lets a scroll be cancelled.
+  const body = $('sheet-body');
+  let bodyTouch = null;
+  body.addEventListener('touchstart', e => {
+    const own = desktop.matches || e.touches.length !== 1 || e.target.closest('.profile svg');
+    bodyTouch = own ? null : { y: e.touches[0].clientY, mode: null };
+  }, { passive: true });
+  body.addEventListener('touchmove', e => {
+    if (!bodyTouch) return;
+    const y = e.touches[0].clientY, dy = y - bodyTouch.y;
+    if (!bodyTouch.mode) {
+      if (!dy) return;
+      bodyTouch.mode = snap !== 'full' || (dy > 0 && body.scrollTop <= 0) ? 'sheet' : 'scroll';
+      if (bodyTouch.mode === 'sheet') dragBegin(bodyTouch.y);
+    }
+    if (bodyTouch.mode !== 'sheet') return;
+    e.preventDefault();
+    dragMove(y);
+  }, { passive: false });
+  body.addEventListener('touchend', e => {
+    if (bodyTouch?.mode === 'sheet') dragStart?.moved ? dragEnd(e.changedTouches[0].clientY) : dragCancel();
+    bodyTouch = null;
+  });
+  body.addEventListener('touchcancel', () => { if (bodyTouch?.mode === 'sheet') dragCancel(); bodyTouch = null; });
   // A one-finger vertical swipe over the map moves the sheet, as if the page scrolled.
   // Returns false on 'start' when there is no sheet to move, so the swipe stays with the map.
   pageDrag = (phase, y) => {
@@ -384,7 +472,7 @@ async function boot() {
     const now = performance.now();
     if (!force && now - lastPush < 1000) return;
     lastPush = now;
-    history.replaceState(null, '', serializeState({ t: time, rider: riders[selected].id, cam: camMode, speed }));
+    history.replaceState(null, '', serializeState({ t: time, rider: riders[selected].id, cam: auto ? 'auto' : camMode, speed }));
   }
 
   // ---- HUD -------------------------------------------------------------------------
@@ -447,6 +535,7 @@ async function boot() {
         app.classList.remove('intro-titled');
         setSnap(snap, false);
         camMode = 'follow'; syncCams();
+        setAuto(true); // first open: the TV camera directs until the viewer takes over
         const go = $('go'); go.classList.add('in'); setTimeout(() => go.classList.remove('in'), 1100);
         setTimeout(() => setPlaying(true), 450);
       },
@@ -455,43 +544,66 @@ async function boot() {
   }
 
   // ---- loop ------------------------------------------------------------------------------
-  let last = performance.now();
+  let last = performance.now(), slowmo = 1;
   function tick(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    // The TV director slows time around the big moments; eased, so it never jolts.
+    const wantSlow = auto && playing && !reducedMotion ? director.timeScale(time, speed) : 1;
+    slowmo += (wantSlow - slowmo) * Math.min(1, dt * 2.5);
     if (playing) {
       const from = time;
-      time = Math.min(duration, time + dt * speed);
+      time = Math.min(duration, time + dt * speed * slowmo);
       const crossed = events.findLast(e => e.t > from && e.t <= time);
-      if (crossed) toast(crossed.text, 2500);
+      if (crossed) auto ? lowerThird(crossed.text, riders[crossed.rider].color) : toast(crossed.text, 2500);
       const met = moments.findLast(m => m.t > from && m.t <= time);
       if (met && !reducedMotion && clip.hidden) showPip(met);
       if (time >= duration) {
         setPlaying(false);
-        if (!finishedShown) { finishedShown = true; showPodium(); }
+        if (!finishedShown) { finishedShown = true; showCard(); }
       }
       pushState();
+      if (auto && playing && !world.introRunning) { const c = director.update({ time, speed, now: now / 1000 }); if (c) cutTo(c); }
     }
-    if (world) world.frame({ time, distances: riders.map((_, i) => distanceAt(i, time)), playing, rate: speed });
+    if (world) world.frame({ time, distances: riders.map((_, i) => distanceAt(i, time)), playing, rate: speed * slowmo });
     updateUi();
     requestAnimationFrame(tick);
   }
 
-  function showPodium() {
-    const table = standings(riders, duration);
-    $('podium-list').innerHTML = '';
-    for (const row of table) {
-      const r = riders[row.index], li = document.createElement('li');
-      li.style.setProperty('--c', r.color);
-      li.innerHTML = `<span class="pos"></span><b class="letter">${r.letter}</b><span class="nm"></span><strong></strong><span class="gap"></span>`;
-      li.querySelector('.pos').textContent = row.rank;
-      li.querySelector('.nm').textContent = r.name;
-      li.querySelector('strong').textContent = formatClock(row.finish);
-      li.querySelector('.gap').textContent = row.rank === 1 ? 'Winner' : formatGap(row.gap);
-      $('podium-list').append(li);
-    }
-    $('podium').hidden = false;
+  // ---- end-of-race card: one canvas, shown here and saved or shared as the same PNG ----
+  const card = $('card'), cardCanvas = $('card-canvas');
+  let cardFile = null, resumeAfterCard = false;
+  async function showCard() {
+    if (!card.hidden) return;
+    resumeAfterCard = playing;
+    setPlaying(false);
+    card.hidden = false;
+    cardFile = null;
+    $('card-share').hidden = true;
+    await drawCard(cardCanvas, { riders, events, route, profile, stats, title: race.title ?? 'Coll de sa Batalla', place: 'Mallorca' });
+    // The file is made now, so Share runs inside the tap (Safari drops a share started after an await).
+    const blob = await new Promise(r => cardCanvas.toBlob(r, 'image/png'));
+    if (!blob) return;
+    cardFile = new File([blob], 'wielki-wyscig-results.png', { type: 'image/png' });
+    $('card-share').hidden = !(navigator.canShare?.({ files: [cardFile] }));
   }
+  function closeCard() {
+    card.hidden = true;
+    if (resumeAfterCard) setPlaying(true);
+    resumeAfterCard = false;
+  }
+  $('card-save').addEventListener('click', () => {
+    if (!cardFile) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(cardFile); a.download = cardFile.name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+  $('card-share').addEventListener('click', () => {
+    if (!cardFile) return;
+    navigator.share({ files: [cardFile], title: document.title, text: `${riders[standings(riders, duration)[0].index].name} wins · ${location.origin}` })
+      .catch(error => { if (error?.name !== 'AbortError') toast('Sharing failed — use Save image.'); });
+  });
 
   // ---- go ------------------------------------------------------------------------------------
   for (const m of moments) world?.addPin({ d: m.d, label: `Video: ${m.caption}`, onClick: () => live && openMoment(m) });
@@ -507,6 +619,7 @@ async function boot() {
   if (initial.shared || reducedMotion) {
     world.setMode(camMode);
     syncCams();
+    if (initial.cam === 'auto') setAuto(true);
     app.dataset.phase = 'race';
     if (!initial.shared) setPlaying(true);
   } else runIntro();

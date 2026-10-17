@@ -197,14 +197,14 @@ async function boot() {
   // Scrubbing pauses the race under the finger and resumes it on release.
   let resumeAfterDrag = false;
   const scrubber = createScrubber($('scrub'), {
-    duration, moments, onSeek: seek,
+    duration, moments, onSeek: seek, clock: formatClock,
     describe: t => {
       const lead = standings(riders, t)[0];
       return { time: formatClock(t), place: `km ${(lead.d / 1000).toFixed(1)} · ${riders[lead.index].name} ${lead.finished ? 'wins' : 'leads'}` };
     },
     onDrag: on => {
       if (on) { resumeAfterDrag = playing; if (playing) setPlaying(false); }
-      else if (resumeAfterDrag) setPlaying(true);
+      else if (resumeAfterDrag && time < duration) setPlaying(true); // dragged to the end: stay there, do not restart
     },
   });
 
@@ -237,6 +237,7 @@ async function boot() {
   function onScroll() {
     const reading = !desktop.matches && sheet.getBoundingClientRect().top < innerHeight * 0.42;
     if (reading !== app.classList.contains('reading')) app.classList.toggle('reading', reading);
+    $('grab').setAttribute('aria-expanded', String(!desktop.matches && scrollY > 40));
   }
   addEventListener('scroll', () => { onScroll(); wake(); }, { passive: true });
   new ResizeObserver(() => { profileChart.resize(); charts.resize(); measure(); }).observe(sheet);

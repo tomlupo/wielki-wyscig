@@ -4,7 +4,7 @@
 // (`touch-action: pan-y`), so only a sideways drag seeks.
 const SNAP_DRAG = 14, SNAP_TAP = 24, PAD = 16; // px; PAD keeps the handle inside the track at both ends
 
-export function createScrubber(el, { duration, moments, describe, onSeek, onDrag }) {
+export function createScrubber(el, { duration, moments, clock, describe, onSeek, onDrag }) {
   const bubble = el.querySelector('.scrub-bubble'), list = el.querySelector('.scrub-moments');
   el.setAttribute('aria-valuemax', String(Math.round(duration)));
   const marks = moments.map(m => {
@@ -93,7 +93,7 @@ export function createScrubber(el, { duration, moments, describe, onSeek, onDrag
       value = t;
       el.style.setProperty('--p', String(t / duration));
       el.setAttribute('aria-valuenow', String(Math.round(t)));
-      const label = describe(t).time;
+      const label = clock(t); // every frame: the clock only, describe() is for the bubble
       el.setAttribute('aria-valuetext', label);
       el.dataset.time = label;
       marks.forEach((mark, i) => mark.classList.toggle('passed', moments[i].t <= t));

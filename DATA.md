@@ -53,7 +53,7 @@ Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSour
 
 ## URL state
 
-`?t=<seconds>&r=<rider id>&cam=<follow|pov|overview|free>&x=<speed>` opens the replay at that moment and skips the intro (`src/state.js`). The Share button copies this link.
+`?t=<seconds>&r=<rider id>&cam=<follow|overview|side|free>&x=<1|4|16>` opens the replay at that moment and skips the intro (`src/state.js`). The Share button copies this link.
 
 ## Development
 

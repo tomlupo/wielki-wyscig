@@ -113,6 +113,22 @@ async function tap(page, selector) {
     assert.ok(moved(home, gestured) > 5, `camera moved only ${moved(home, gestured).toFixed(2)} m`);
     assert.equal(await page.evaluate(() => scrollY), y0, 'page scrolled');
   });
+  await check('two fingers landing 120 ms apart (a real hand) still pinch the map, not the page', async () => {
+    const start = await settle(page);
+    const one = { x: 150, y: 380, id: 0 };
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [one] });
+    await page.waitForTimeout(120);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [one, { x: 240, y: 460, id: 1 }] });
+    for (let k = 1; k <= 12; k++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 150 - 5 * k, y: 380 - 7 * k, id: 0 }, { x: 240 + 5 * k, y: 460 + 7 * k, id: 1 }] });
+      await page.waitForTimeout(16);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const after = await settle(page);
+    assert.equal(await page.evaluate(() => scrollY), 0, 'page scrolled');
+    assert.ok(moved(start, after) > 5, `camera moved only ${moved(start, after).toFixed(2)} m`);
+    gestured = after;
+  });
   await check('two-finger vertical drag (orbit) does not scroll the page', async () => {
     await touch(cdp, [[[140, 300], [140, 450]], [[250, 300], [250, 450]]]);
     const after = await settle(page);

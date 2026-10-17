@@ -35,9 +35,9 @@ export function detectMoments(riders, route, { step = 5, max = 8 } = {}) {
   }
 
   // Attack: a rider level with another (≤ 3 s) is ≥ 8 s clear of them 150 s later.
-  const window = Math.round(150 / step), lastAttack = new Map();
-  for (let k = Math.round(60 / step); k + window < frames.length; k++) {
-    const a = frames[k], b = frames[k + window];
+  const span = Math.round(150 / step), lastAttack = new Map();
+  for (let k = Math.round(60 / step); k + span < frames.length; k++) {
+    const a = frames[k], b = frames[k + span];
     for (const i of riders.keys()) {
       if (a.gap[i].finished || b.gap[i].finished || (lastAttack.get(i) ?? -Infinity) > a.t - 300) continue;
       const dropped = [...riders.keys()].some(j => j !== i && !b.gap[j].finished

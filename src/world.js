@@ -15,6 +15,7 @@ const HAZE = new THREE.Color(0xc4d0da), ZENITH = new THREE.Color(0x2f5f9e), SUN_
 export async function createWorld({ container, labels, terrain, race, onSelect }) {
   const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
   const coarse = matchMedia('(pointer: coarse)').matches;
+  const still = matchMedia('(prefers-reduced-motion: reduce)'); // cut between camera poses instead of gliding, no idle spin
   const maxDpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
   let dpr = maxDpr;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -396,7 +397,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       const ahead = side ? 0 : 45;
       wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (side ? 8 : 16), r.pos.z + Math.cos(chaseHeading) * ahead);
     } else {
-      if (rig.mode === 'overview' && now - rig.lastInput > 5000) rig.orbit.theta += 0.00004 * (now - lastNow);
+      if (rig.mode === 'overview' && !still.matches && now - rig.lastInput > 5000) rig.orbit.theta += 0.00004 * (now - lastNow);
       orbitPosition(rig.orbit, wantPos);
       wantLook.copy(rig.orbit.target);
     }
@@ -472,6 +473,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       ({ dist: pinch, mid, angle } = now);
       return;
     }
+    if (!e.buttons) { pointers.delete(e.pointerId); return; } // released outside the stage: no hover-orbit
     rig.lastInput = performance.now();
     if (e.shiftKey || e.buttons === 2) pan(dx, dy);
     else rotate(dx, dy);
@@ -614,7 +616,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       desiredPose(now, realDt);
       const transition = now < rig.transitionUntil, dragging = pointers.size > 0;
       const lambda = transition ? 2.6 : dragging ? 14 : chasing() ? 5 : 6;
-      const k = 1 - Math.exp(-realDt * lambda);
+      const k = still.matches && !dragging ? 1 : 1 - Math.exp(-realDt * lambda);
       camPos.lerp(wantPos, k);
       camLook.lerp(wantLook, Math.min(1, k * 1.4));
     }

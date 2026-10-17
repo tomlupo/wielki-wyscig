@@ -1,5 +1,5 @@
 // Shareable view state in the URL query: ?t=1080&r=rider-b&cam=follow&x=30
-export const CAMERAS = ['overview', 'follow', 'pov', 'free'];
+export const CAMERAS = ['follow', 'pov', 'overview', 'free']; // order of the camera buttons and keys 1–4
 export const SPEEDS = [1, 10, 30, 60, 120];
 export const DEFAULTS = { t: 0, rider: null, cam: 'follow', speed: 30 };
 

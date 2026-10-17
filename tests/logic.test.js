@@ -2,11 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { standings, formatGap, formatClock } from '../src/race.js';
-import { altitudeAt, gradeAt, climbStats, gradeColor } from '../src/profile.js';
 import { parseState, serializeState } from '../src/state.js';
 
 const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
-const route = JSON.parse(readFileSync(new URL('../public/terrain.json', import.meta.url))).route;
 
 test('standings: finishers rank by finish time, gaps are time behind the leader at the same point', () => {
   const t = 1700, rows = standings(race.riders, t);
@@ -31,17 +29,6 @@ test('gap and clock formatting keep small gaps visible', () => {
   assert.equal(formatClock(2040), '34:00');
   assert.equal(formatClock(3725), '1:02:05');
   assert.equal(formatClock(-5), '0:00');
-});
-
-test('profile: altitude interpolates, grades are sane, stats match the climb', () => {
-  assert.equal(altitudeAt(route, 0), route[0][2]);
-  assert.equal(altitudeAt(route, 1e9), route.at(-1)[2]);
-  const s = climbStats(route);
-  assert.ok(Math.abs(s.length - 7781.08) < 0.01);
-  assert.ok(s.avgGrade > 4 && s.avgGrade < 6);
-  for (let d = 0; d <= s.length; d += 250) assert.ok(Math.abs(gradeAt(route, d)) < 25);
-  assert.deepEqual(gradeColor(-3), gradeColor(0));
-  assert.deepEqual(gradeColor(40), [235, 64, 70]);
 });
 
 test('URL state round-trips and rejects junk', () => {

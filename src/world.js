@@ -471,7 +471,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   }
   function zoom(f) {
     if (rig.mode === 'follow') rig.follow.radius = Math.max(25, Math.min(1500, rig.follow.radius * f));
-    else if (rig.mode === 'pov') { setMode('follow'); }
+    else if (rig.mode === 'pov') { setMode('follow'); onModeChange?.('follow'); }
     else rig.orbit.radius = Math.max(120, Math.min(14000, rig.orbit.radius * f));
   }
   function pan(dx, dy) {
@@ -517,7 +517,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   new ResizeObserver(resize).observe(container);
   resize();
 
-  function frame({ time, distances, playing, rate, dt }) {
+  function frame({ time, distances, playing, rate }) {
     const now = performance.now();
     const realDt = Math.min(0.1, (now - lastNow) / 1000);
     // Adaptive resolution: step pixel ratio down if the phone cannot hold ~45 fps.
@@ -539,9 +539,9 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       r.body.rotation.x = -Math.asin(Math.max(-0.3, Math.min(0.3, r.dir.y)));
       if (moving) r.phase += realDt * Math.min(1.45 * rate, 2.3) * Math.PI * 2;
       if (moving || r.posedAt !== d) { pedal(r); r.posedAt = d; }
-      r.g.visible = true;
 
       const camDist = camera.position.distanceTo(r.pos), sel = i === rig.selected;
+      r.g.visible = camDist < 2500; // LOD: far away the beam and label carry the rider, the jointed model is skipped
       const bh = Math.max(18, camDist * (sel ? 0.12 : 0.085)), bw = Math.max(0.6, camDist * (sel ? 0.0026 : 0.0018));
       r.beam.position.copy(r.pos);
       r.beam.scale.set(bw, bh, bw);
@@ -588,7 +588,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     riders.forEach((r, i) => {
       project.copy(r.pos).y += 2.2 * RIDER_SCALE;
       project.project(camera);
-      const visible = project.z < 1 && Math.abs(project.x) < 1.05 && Math.abs(project.y) < 1.05 && r.g.visible;
+      const visible = project.z < 1 && Math.abs(project.x) < 1.05 && Math.abs(project.y) < 1.05;
       r.label.hidden = !visible;
       if (visible) r.label.style.transform = `translate3d(${(project.x * 0.5 + 0.5) * w}px,${(-project.y * 0.5 + 0.5) * h}px,0)`;
       r.label.classList.toggle('sel', i === rig.selected);
@@ -615,10 +615,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     frame, setMode, startIntro, skipIntro,
     // Ready once imagery is decoded and shaders are compiled (in parallel where the GPU allows).
     ready: textureReady.then(() => renderer.extensions.has('KHR_parallel_shader_compile') && renderer.compileAsync(scene, camera)).catch(() => {}),
-    get mode() { return rig.mode; },
     get introRunning() { return !!rig.intro; },
     select(i) { rig.selected = i; },
-    zoom: f => { rig.lastInput = performance.now(); zoom(f); },
     onModeChange(fn) { onModeChange = fn; },
     setInsetRight(px) { if (px !== insetRight) { insetRight = px; resize(); } },
   };

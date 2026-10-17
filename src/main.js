@@ -73,17 +73,18 @@ async function boot() {
     const li = document.createElement('li');
     li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
     li.querySelector('.nm').textContent = r.name;
-    li.querySelector('button').addEventListener('click', () => { select(i); if (camMode === 'overview' || camMode === 'free') setCam('follow'); });
+    li.querySelector('button').addEventListener('click', () => followRider(i));
     board.append(li);
     return { li, rank: li.querySelector('.rank'), gap: li.querySelector('.gap'), sens: li.querySelector('.sens'), prog: li.querySelector('.prog i'), btn: li.querySelector('button') };
   });
 
   // ---- 3D world ------------------------------------------------------------
-  let world = null;
+  // Callbacks from the world can fire while it is still loading; they wait until the HUD is wired (`live`).
+  let world = null, live = false;
   try {
     const { createWorld } = await worldModule;
-    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => { select(i); if (camMode !== 'pov') setCam('follow'); } });
-    world.onModeChange(mode => { camMode = mode; syncCams(); pushState(); });
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i) });
+    world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
   } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
   if (!world) {
@@ -105,8 +106,14 @@ async function boot() {
     updateUi(true);
     pushState(true);
   }
+  // Picking a rider from the board or a 3D label: keep a rider camera, leave the map views for Follow.
+  function followRider(i) {
+    select(i);
+    if (camMode !== 'pov') setCam('follow');
+  }
   function setCam(mode) {
     if (!world || !CAMERAS.includes(mode)) return;
+    if (world.introRunning) world.skipIntro(); // ends the intro through its onDone, so the race still starts
     camMode = mode;
     world.setMode(mode);
     syncCams();
@@ -153,7 +160,7 @@ async function boot() {
     else if (e.key === 'ArrowLeft') seek(time - 15);
     else if (e.key === ']') select((selected + 1) % riders.length);
     else if (e.key === '[') select((selected + riders.length - 1) % riders.length);
-    else if (/^[1-4]$/.test(e.key)) setCam(['follow', 'pov', 'overview', 'free'][e.key - 1]);
+    else if (/^[1-4]$/.test(e.key)) setCam(CAMERAS[e.key - 1]);
   });
 
   const profileChart = renderProfile($('profile'), profile, len, riders, d => seek(timeAtDistance(riders[selected].samples, d)));
@@ -165,7 +172,7 @@ async function boot() {
   let snap = 'peek', sheetY = 0, dragStart = null;
   function snapHeights() {
     const top = sheet.getBoundingClientRect().top - sheetY;
-    const peek = $('board').previousElementSibling.getBoundingClientRect().top - sheetY - top;
+    const peek = $('standings-title').getBoundingClientRect().top - sheetY - top;
     const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
     return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }
@@ -215,6 +222,8 @@ async function boot() {
   // ---- URL state -----------------------------------------------------------------
   let lastPush = 0;
   function pushState(force = false) {
+    // Nothing is written before the race phase: a boot-time ?t=0 would make every reload look like a shared link and skip the intro.
+    if (app.dataset.phase !== 'race') return;
     const now = performance.now();
     if (!force && now - lastPush < 1000) return;
     lastPush = now;
@@ -247,7 +256,7 @@ async function boot() {
     text('f-w', me.finished ? '—' : String(tel.watts ?? '—'));
     text('f-hr', me.finished ? '—' : String(tel.hr ?? '—'));
     text('f-v', me.finished || tel.speed == null ? '—' : tel.speed.toFixed(1));
-    const grade = gradeAt(route, me.d);
+    const grade = gradeAt(route, me.d, 200); // same smoothing scale as the profile colours
     text('f-g', grade.toFixed(1));
     $('f-g').style.color = `rgb(${gradeColor(grade)})`;
     text('clock', formatClock(time));
@@ -323,6 +332,7 @@ async function boot() {
   }
 
   // ---- go ------------------------------------------------------------------------------------
+  live = true;
   select(selected);
   syncCams();
   setSnap('peek', false);

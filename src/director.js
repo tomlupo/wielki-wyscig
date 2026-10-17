@@ -7,10 +7,13 @@
 // `minCut`, so the picture stays calm at every replay speed.
 //
 // update() returns a cut { shot, rider, side, caption } or null (hold).
-// shot ∈ follow | side | pov | heli | overview (see world.setShot).
+// shot ∈ follow | side | pov | heli | drone | high | ahead | overview (see world.setShot).
+// timeScale() eases playback down to slow motion around the big moments.
 
-const SHOT_FOR = { lead: ['side', 'follow'], pass: ['side', 'pov', 'follow'], summit: ['follow', 'side'], finish: ['side'], media: ['follow'] };
-const IDLE = ['heli', 'chase', 'side', 'overview', 'follow'];
+const SHOT_FOR = { lead: ['side', 'ahead', 'follow'], pass: ['side', 'drone', 'follow'], summit: ['ahead', 'side'], finish: ['ahead', 'side'], media: ['follow'] };
+// With nothing coming, slow wide establishing shots: the group from a drone, the helicopter, a high tracking shot, a long lens from up the road.
+const IDLE = ['drone', 'heli', 'chase', 'high', 'ahead', 'overview', 'follow'];
+const SLOWMO_SCORE = 50, SLOWMO_REACH = 2.5, SLOWMO_MIN = 0.35; // events that slow time; wall seconds either side; slowest rate
 
 export function createDirector({ targets, order, names, minCut = 6, lead = 3, hold = 4, idle = 16 }) {
   // targets: [{ t, type, rider, score }] sorted by t; order(t) → rider indices by race position.
@@ -64,6 +67,18 @@ export function createDirector({ targets, order, names, minCut = 6, lead = 3, ho
       if (kind === 'chase' && ranks.length > 1) return cut(now, 'follow', ranks[1], `${names[ranks[1]]} · P2`);
       if (kind === 'overview') return cut(now, 'overview', ranks[0], null);
       return leaderCut(now, time, kind === 'chase' ? 'follow' : kind);
+    },
+    // Playback rate factor in (0, 1]: 1 away from big moments, easing to SLOWMO_MIN at one.
+    timeScale(time, speed) {
+      let s = 1;
+      for (const e of targets) {
+        if (e.score < SLOWMO_SCORE) continue;
+        const wall = Math.abs(e.t - time) / speed;
+        if (wall >= SLOWMO_REACH) continue;
+        const u = wall / SLOWMO_REACH;
+        s = Math.min(s, SLOWMO_MIN + (1 - SLOWMO_MIN) * u * u * (3 - 2 * u));
+      }
+      return s;
     },
   };
 }

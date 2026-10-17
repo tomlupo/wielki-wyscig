@@ -253,6 +253,8 @@ async function boot() {
   function setAuto(on) {
     if (!world || on === auto) return;
     auto = on;
+    world.setCinematic(on);
+    app.classList.toggle('auto', on); // letterbox bars while the director has the camera
     if (on) cutTo(director.start(time, performance.now() / 1000));
     syncCams();
     pushState(true);
@@ -260,10 +262,16 @@ async function boot() {
   function autoOff() { if (auto) setAuto(false); }
   function cutTo(c) {
     select(c.rider);
-    world.setShot(c.shot, c.side);
+    if (world.setShot(c.shot, c.side) === 'cut') dip();
     camMode = CAMERAS.includes(c.shot) ? c.shot : 'follow';
     syncCams();
     if (c.caption) lowerThird(c.caption, riders[c.rider].color);
+  }
+  // A long move is a cut, not a fly-by: dip the picture so it reads as one.
+  function dip() {
+    const stage = $('stage');
+    stage.classList.remove('dip'); void stage.offsetWidth;
+    stage.classList.add('dip');
   }
   let capTimer = 0;
   function lowerThird(message, color) {
@@ -506,13 +514,16 @@ async function boot() {
   }
 
   // ---- loop ------------------------------------------------------------------------------
-  let last = performance.now();
+  let last = performance.now(), slowmo = 1;
   function tick(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    // The TV director slows time around the big moments; eased, so it never jolts.
+    const wantSlow = auto && playing && !reducedMotion ? director.timeScale(time, speed) : 1;
+    slowmo += (wantSlow - slowmo) * Math.min(1, dt * 2.5);
     if (playing) {
       const from = time;
-      time = Math.min(duration, time + dt * speed);
+      time = Math.min(duration, time + dt * speed * slowmo);
       const crossed = events.findLast(e => e.t > from && e.t <= time);
       if (crossed) auto ? lowerThird(crossed.text, riders[crossed.rider].color) : toast(crossed.text, 2500);
       const met = moments.findLast(m => m.t > from && m.t <= time);
@@ -524,7 +535,7 @@ async function boot() {
       pushState();
       if (auto && playing && !world.introRunning) { const c = director.update({ time, speed, now: now / 1000 }); if (c) cutTo(c); }
     }
-    if (world) world.frame({ time, distances: riders.map((_, i) => distanceAt(i, time)), playing, rate: speed });
+    if (world) world.frame({ time, distances: riders.map((_, i) => distanceAt(i, time)), playing, rate: speed * slowmo });
     updateUi();
     requestAnimationFrame(tick);
   }

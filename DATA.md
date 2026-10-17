@@ -68,3 +68,7 @@ Vite's development middleware serves the same `/api/race` contract. Production u
 - All demo rider metrics are synthetic and are not physiological or performance estimates for real people.
 
 Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1; markers and route width are enlarged for readability.
+
+## Real rides: `scripts/fit_to_race.py`
+
+`uv run scripts/fit_to_race.py "El Lobo=rides/el-lobo.fit" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), and stretches distance onto the reference road. Raw ride files stay in `rides/`, which is git-ignored: only the trimmed climb is published.

@@ -53,7 +53,7 @@ test('summit arrivals follow the finish order and the winner finishes once', () 
   const riders = [steady('Slow', 1.5), steady('Fast', 2.5), steady('Mid', 2)];
   const events = deriveEvents(riders);
   assert.deepEqual(lines(events.filter(e => e.type === 'summit' || e.type === 'finish')), [
-    '400 finish Fast wins at the summit · 6:40',
+    '400 finish Fast wins at the summit',
     '500 summit Mid tops out — 2nd',
     '667 summit Slow tops out — 3rd',
   ]);

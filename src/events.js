@@ -5,7 +5,7 @@
 // Every rider is read on one clock (`step` s). A change of order counts only
 // when it HOLDS for `hold` s, so GPS jitter between two riders side by side
 // makes no event. The event time is the moment the new order began.
-import { interpolate, timeAtDistance, formatClock } from './race.js';
+import { interpolate, timeAtDistance } from './race.js';
 
 const ORDINAL = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th');
 
@@ -70,7 +70,7 @@ export function deriveEvents(riders, { step = 1, hold = 10, swapWindow = 60, max
     events.push({ t, type: 'summit', rider: i, rank: k + 1, text: `${name(i)} tops out — ${ORDINAL(k + 1)}`, score: k === 0 ? 70 : k < 3 ? 65 - 5 * k : 30 - k });
   });
   const winner = order[0];
-  events.push({ t: finish[winner], type: 'finish', rider: winner, rank: 1, text: `${name(winner)} wins${atFinish ? ' at the summit' : ''} · ${formatClock(finish[winner])}`, score: 100 });
+  events.push({ t: finish[winner], type: 'finish', rider: winner, rank: 1, text: `${name(winner)} wins${atFinish ? ' at the summit' : ''}`, score: 100 });
 
   return events
     .sort((a, b) => b.score - a.score || a.t - b.t)

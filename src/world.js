@@ -7,6 +7,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const RIDER_SCALE = 5; // riders are drawn 5× life size so they read on a 31 m terrain grid
 const ROAD_LIFT = 1.6, ROAD_RADIUS = 2.6;
 const FOLLOW_HOME = { theta: 0, phi: 1.2, radius: 150 };
+const SIDE_HOME = { theta: Math.PI / 2, phi: 1.36, radius: 230 }; // level with the rider, square to the road
 const SUN_DIR = new THREE.Vector3(-0.74, 0.56, 0.42).normalize(); // low WSW afternoon sun
 const HAZE = new THREE.Color(0xc4d0da), ZENITH = new THREE.Color(0x2f5f9e), SUN_TINT = new THREE.Color(0xffd9a0);
 
@@ -329,8 +330,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   const rig = {
     mode: 'overview', selected: 0, lastInput: -1e9, transitionUntil: 0,
     orbit: { target: centre.clone(), radius: 6200, theta: 0.42, phi: 0.98 },
-    follow: { ...FOLLOW_HOME },
-    pov: { yaw: 0 },
+    follow: { ...FOLLOW_HOME }, // the chase pose around the selected rider, shared by follow and side
     intro: null,
   };
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
@@ -350,6 +350,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       Object.assign(rig.orbit, { radius: 900, phi: 0.9 });
     }
     if (mode === 'follow') Object.assign(rig.follow, { ...FOLLOW_HOME });
+    if (mode === 'side') Object.assign(rig.follow, { ...SIDE_HOME, theta: SIDE_HOME.theta * openSide() });
     rig.mode = mode;
     rig.intro = null;
     rig.transitionUntil = instant ? 0 : performance.now() + 1600;
@@ -365,23 +366,35 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   // The chase heading follows the road over 140 m and turns slowly, so hairpins do not whip the camera.
   let chaseHeading = null;
   const chaseDir = new THREE.Vector3();
+  // Side profile looks across the road from the open (lower) side, so the slope is not hidden by the hill.
+  function openSide() {
+    const r = riders[rig.selected], side = tmpA.crossVectors(r.dir, UP).normalize(), reach = SIDE_HOME.radius;
+    const left = elevation(r.pos.x + side.x * reach, r.pos.z + side.z * reach), right = elevation(r.pos.x - side.x * reach, r.pos.z - side.z * reach);
+    return left <= right ? -1 : 1;
+  }
+  let sideCheck = 0;
   function desiredPose(now, dt) {
     const r = riders[rig.selected];
-    if (rig.mode === 'follow' || rig.mode === 'pov') {
-      const pov = rig.mode === 'pov';
-      roadDir(currentD[rig.selected], chaseDir, pov ? 30 : 70);
+    if (rig.mode === 'follow' || rig.mode === 'side') {
+      const side = rig.mode === 'side';
+      roadDir(currentD[rig.selected], chaseDir, side ? 120 : 70);
       const target = Math.atan2(chaseDir.x, chaseDir.z);
       if (chaseHeading === null) chaseHeading = target;
       const delta = Math.atan2(Math.sin(target - chaseHeading), Math.cos(target - chaseHeading));
-      chaseHeading += delta * Math.min(1, dt * (pov ? 2.4 : 1.6));
-      // Rider view is a low, tight chase just over the shoulder; drag swings it sideways.
-      const f = pov ? { theta: rig.pov.yaw, phi: 1.3, radius: 9 * RIDER_SCALE } : rig.follow, heading = chaseHeading + Math.PI + f.theta;
+      chaseHeading += delta * Math.min(1, dt * (side ? 0.8 : 1.6));
+      // As the road turns, the side camera crosses over when the other side is clearly lower.
+      if (side && now - sideCheck > 2000 && Math.abs(Math.abs(rig.follow.theta) - Math.PI / 2) < 0.6) {
+        sideCheck = now;
+        const want = openSide();
+        if (Math.sign(rig.follow.theta) !== want) rig.follow.theta = -rig.follow.theta;
+      }
+      const f = rig.follow, heading = chaseHeading + Math.PI + f.theta;
       wantPos.set(
         r.pos.x + f.radius * Math.sin(f.phi) * Math.sin(heading),
-        r.pos.y + f.radius * Math.cos(f.phi) + (pov ? 2.4 * RIDER_SCALE : 6),
+        r.pos.y + f.radius * Math.cos(f.phi) + 6,
         r.pos.z + f.radius * Math.sin(f.phi) * Math.cos(heading));
-      const ahead = pov ? 40 : 45;
-      wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (pov ? 0.2 * RIDER_SCALE : 16), r.pos.z + Math.cos(chaseHeading) * ahead);
+      const ahead = side ? 0 : 45;
+      wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (side ? 8 : 16), r.pos.z + Math.cos(chaseHeading) * ahead);
     } else {
       if (rig.mode === 'overview' && now - rig.lastInput > 5000) rig.orbit.theta += 0.00004 * (now - lastNow);
       orbitPosition(rig.orbit, wantPos);
@@ -419,59 +432,88 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
   }
 
   // ---- input --------------------------------------------------------------
+  // Mouse: drag orbits, right- or shift-drag pans, the wheel zooms.
+  // Touch: one finger belongs to the page — the canvas and the rider labels are `touch-action: pan-y`, so a
+  // vertical swipe scrolls and a sideways one only earns the two-finger hint. Two
+  // fingers move the map: drag pans (or swings a rider camera), pinch zooms, twist turns.
   const pointers = new Map();
-  let pinch = 0, mid = null, lastTap = 0, dragged = 0;
+  let pinch = 0, mid = null, angle = null, lastTap = 0, dragged = 0;
   const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  canvas.addEventListener('pointerdown', e => {
+  const touchCount = () => [...pointers.values()].filter(p => p.touch).length;
+  const twoFinger = () => {
+    const [a, b] = [...pointers.values()].filter(p => p.touch);
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], angle: Math.atan2(b.y - a.y, b.x - a.x) };
+  };
+  container.addEventListener('pointerdown', e => {
     if (rig.intro) { skipIntro(); return; }
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    canvas.setPointerCapture(e.pointerId);
+    const touch = e.pointerType === 'touch';
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, touch });
+    if (!touch && e.target === canvas) canvas.setPointerCapture(e.pointerId);
     dragged = 0;
     rig.lastInput = performance.now();
-    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+    if (touch && touchCount() === 2) ({ dist: pinch, mid, angle } = twoFinger());
   });
-  canvas.addEventListener('pointermove', e => {
-    if (!pointers.has(e.pointerId)) return;
-    const old = pointers.get(e.pointerId);
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    rig.lastInput = performance.now();
-    const dx = e.clientX - old[0], dy = e.clientY - old[1];
+  container.addEventListener('pointermove', e => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
     dragged += Math.abs(dx) + Math.abs(dy);
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      if (pinch) zoom(pinch / dist);
-      if (mid && rig.mode !== 'follow' && rig.mode !== 'pov') pan(m[0] - mid[0], m[1] - mid[1]);
-      pinch = dist; mid = m;
-    } else if (e.shiftKey || e.buttons === 2) pan(dx, dy);
+    if (p.touch) {
+      if (touchCount() < 2) { if (dragged > 14) onHint?.(); return; }
+      rig.lastInput = performance.now();
+      const now = twoFinger();
+      if (pinch) zoom(pinch / now.dist);
+      if (angle !== null) turn(Math.atan2(Math.sin(now.angle - angle), Math.cos(now.angle - angle)));
+      if (mid) {
+        const mx = now.mid[0] - mid[0], my = now.mid[1] - mid[1];
+        if (rig.mode === 'follow' || rig.mode === 'side') rotate(mx, my); else pan(mx, my);
+      }
+      ({ dist: pinch, mid, angle } = now);
+      return;
+    }
+    rig.lastInput = performance.now();
+    if (e.shiftKey || e.buttons === 2) pan(dx, dy);
     else rotate(dx, dy);
   });
   const release = e => {
+    const p = pointers.get(e.pointerId);
     pointers.delete(e.pointerId);
-    pinch = 0; mid = null;
-    if (e.type === 'pointerup' && dragged < 8) {
+    pinch = 0; mid = null; angle = null;
+    // The browser took a one-finger swipe for page scroll: say once how the map moves.
+    if (e.type === 'pointercancel' && p?.touch && !hintedOnScroll) { hintedOnScroll = true; onHint?.(); }
+    if (e.type === 'pointerup' && dragged < 8 && e.target === canvas) {
       const now = performance.now();
       if (now - lastTap < 320) doubleTap(e);
       lastTap = now;
     }
   };
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('wheel', e => { e.preventDefault(); if (rig.intro) return skipIntro(); rig.lastInput = performance.now(); zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+  let hintedOnScroll = false;
+  container.addEventListener('pointerup', release);
+  container.addEventListener('pointercancel', release);
+  // Two fingers down: keep the page still so the gesture reaches the map.
+  const holdPage = e => { if (e.touches.length > 1 && e.cancelable) e.preventDefault(); };
+  container.addEventListener('touchstart', holdPage, { passive: false });
+  container.addEventListener('touchmove', holdPage, { passive: false });
+  container.addEventListener('contextmenu', e => e.preventDefault());
+  container.addEventListener('wheel', e => { e.preventDefault(); if (rig.intro) return skipIntro(); rig.lastInput = performance.now(); zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
 
+  const chasing = () => rig.mode === 'follow' || rig.mode === 'side';
   function rotate(dx, dy) {
-    if (rig.mode === 'follow') {
+    if (chasing()) {
       rig.follow.theta -= dx * 0.006;
       rig.follow.phi = Math.max(0.35, Math.min(1.42, rig.follow.phi - dy * 0.005));
-    } else if (rig.mode === 'pov') rig.pov.yaw = Math.max(-1.2, Math.min(1.2, rig.pov.yaw + dx * 0.004));
-    else {
+    } else {
       rig.orbit.theta -= dx * 0.005;
       rig.orbit.phi = Math.max(0.12, Math.min(1.42, rig.orbit.phi - dy * 0.005));
     }
   }
+  function turn(radians) {
+    if (chasing()) rig.follow.theta += radians;
+    else rig.orbit.theta += radians;
+  }
   function zoom(f) {
-    if (rig.mode === 'follow') rig.follow.radius = Math.max(25, Math.min(1500, rig.follow.radius * f));
-    else if (rig.mode === 'pov') { setMode('follow'); onModeChange?.('follow'); }
+    if (chasing()) rig.follow.radius = Math.max(25, Math.min(1500, rig.follow.radius * f));
     else rig.orbit.radius = Math.max(120, Math.min(14000, rig.orbit.radius * f));
   }
   function pan(dx, dy) {
@@ -482,7 +524,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     rig.orbit.target.y = elevation(rig.orbit.target.x, rig.orbit.target.z);
   }
   function doubleTap(e) {
-    if (rig.mode === 'follow') { Object.assign(rig.follow, { ...FOLLOW_HOME }); return; }
+    if (chasing()) { setMode(rig.mode); return; }
     const rect = canvas.getBoundingClientRect();
     ndc.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
@@ -494,7 +536,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     rig.transitionUntil = performance.now() + 1200;
     onModeChange?.('free');
   }
-  let onModeChange = null;
+  let onModeChange = null, onHint = null;
 
   // ---- frame ----------------------------------------------------------------
   const currentD = race.riders.map(() => 0);
@@ -546,7 +588,6 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
       r.beam.position.copy(r.pos);
       r.beam.scale.set(bw, bh, bw);
       r.beam.material.uniforms.uAlpha.value = Math.min(0.95, camDist / 600) * (sel ? 1 : 0.7);
-      r.beam.visible = !(rig.mode === 'pov' && i === rig.selected);
 
       const half = Math.max(0.9, Math.min(9, camDist * 0.002)), trailKey = `${d}:${half.toFixed(1)}`;
       r.trail.material.opacity = sel ? 1 : 0.4;
@@ -572,13 +613,12 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     } else {
       desiredPose(now, realDt);
       const transition = now < rig.transitionUntil, dragging = pointers.size > 0;
-      const lambda = transition ? 2.6 : dragging ? 14 : rig.mode === 'follow' ? 5 : rig.mode === 'pov' ? 7 : 6;
+      const lambda = transition ? 2.6 : dragging ? 14 : chasing() ? 5 : 6;
       const k = 1 - Math.exp(-realDt * lambda);
       camPos.lerp(wantPos, k);
       camLook.lerp(wantLook, Math.min(1, k * 1.4));
-      if (rig.mode === 'pov' && !dragging) rig.pov.yaw *= 1 - Math.min(1, realDt * 1.5);
     }
-    camPos.y = Math.max(camPos.y, elevation(camPos.x, camPos.z) + (rig.mode === 'pov' ? 6 : 14));
+    camPos.y = Math.max(camPos.y, elevation(camPos.x, camPos.z) + 14);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
     camera.updateMatrixWorld();
@@ -618,6 +658,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect }
     get introRunning() { return !!rig.intro; },
     select(i) { rig.selected = i; },
     onModeChange(fn) { onModeChange = fn; },
+    onHint(fn) { onHint = fn; },
+    get cameraPosition() { return camera.position.toArray(); },
     setInsetRight(px) { if (px !== insetRight) { insetRight = px; resize(); } },
   };
 }

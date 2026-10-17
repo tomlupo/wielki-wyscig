@@ -33,9 +33,11 @@ test('gap and clock formatting keep small gaps visible', () => {
 
 test('URL state round-trips and rejects junk', () => {
   const ctx = { riderIds: ['A', 'B'], duration: 2040 };
-  const s = parseState(serializeState({ t: 1080.4, rider: 'B', cam: 'pov', speed: 60 }), ctx);
-  assert.deepEqual({ t: s.t, rider: s.rider, cam: s.cam, speed: s.speed, shared: s.shared }, { t: 1080, rider: 'B', cam: 'pov', speed: 60, shared: true });
+  const s = parseState(serializeState({ t: 1080.4, rider: 'B', cam: 'side', speed: 4 }), ctx);
+  assert.deepEqual({ t: s.t, rider: s.rider, cam: s.cam, speed: s.speed, shared: s.shared }, { t: 1080, rider: 'B', cam: 'side', speed: 4, shared: true });
   const junk = parseState('?t=abc&r=Z&cam=drone&x=7', ctx);
-  assert.deepEqual({ t: junk.t, rider: junk.rider, cam: junk.cam, speed: junk.speed, shared: junk.shared }, { t: 0, rider: null, cam: 'follow', speed: 30, shared: false });
+  assert.deepEqual({ t: junk.t, rider: junk.rider, cam: junk.cam, speed: junk.speed, shared: junk.shared }, { t: 0, rider: null, cam: 'follow', speed: 16, shared: false });
+  // Links shared before the rider view was retired still open, on the follow camera.
+  assert.equal(parseState('?cam=pov', ctx).cam, 'follow');
   assert.equal(parseState('?t=99999', ctx).t, 2040);
 });

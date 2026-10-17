@@ -16,6 +16,7 @@
 <body>
 <div id="app" class="app" data-phase="loading">
   <div class="stage" id="stage"><div class="labels" id="labels"></div></div>
+  <div class="hint" id="hint" aria-hidden="true"><span>Use two fingers to move the map</span></div>
 
   <header class="top">
     <div class="brand">
@@ -26,40 +27,28 @@
     <div class="badge" id="badge"><i></i><span id="badge-text">Simulated</span></div>
   </header>
 
-  <section class="focus" id="focus" aria-label="Selected rider">
-    <div class="focus-head">
-      <b class="letter" id="f-letter">A</b>
-      <div class="who"><strong id="f-name">—</strong><span id="f-pos">—</span></div>
-      <div class="togo"><b id="f-togo">—</b><span>km to go</span></div>
+  <!-- On a phone the page itself scrolls: the map stays put and the sheet rides up over it. -->
+  <div class="spacer" id="spacer" aria-hidden="true"></div>
+  <section class="sheet" id="sheet" aria-label="Race details">
+    <div class="peek" id="peek">
+      <button class="peek-toggle" id="grab" aria-label="Race details" aria-expanded="false">
+        <span class="grab-bar"></span>
+        <span class="peek-lead"><b class="letter" id="p-letter">A</b><span><strong id="p-name">—</strong><small id="p-note">leads</small></span></span>
+        <span class="peek-gap"><b id="p-gap">—</b><small id="p-gap-note">—</small></span>
+      </button>
+      <button id="share" class="icon-btn" aria-label="Share this moment"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v8h14v-8"/></svg></button>
     </div>
-    <dl class="stats">
+    <h2 class="sec" id="standings-title">Standings</h2>
+    <ol class="board" id="board"></ol>
+    <h2 class="sec" id="rider-title"><span id="t-name"></span> · <span id="f-pos">—</span></h2>
+    <dl class="stats" id="stats">
+      <div><dt>To go</dt><dd><b id="f-togo">—</b><small>km</small></dd></div>
       <div><dt>Power</dt><dd><b id="f-w">—</b><small>W</small></dd></div>
       <div><dt>Heart</dt><dd><b id="f-hr">—</b><small>bpm</small></dd></div>
       <div><dt>Speed</dt><dd><b id="f-v">—</b><small>km/h</small></dd></div>
       <div><dt>Grade</dt><dd><b id="f-g">—</b><small>%</small></dd></div>
     </dl>
-  </section>
-
-  <nav class="cams" id="cams" aria-label="Camera">
-    <button data-cam="follow" aria-label="Follow rider"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="7.5"/></svg><span>Follow</span></button>
-    <button data-cam="pov" aria-label="Rider's view"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Rider</span></button>
-    <button data-cam="overview" aria-label="Mountain overview"><svg viewBox="0 0 24 24"><path d="M2 20 9 8l4 6 3-4 6 10z"/><path d="m7.4 10.7 1.6 1.3 1.4-1.6"/></svg><span>Mountain</span></button>
-    <button data-cam="free" aria-label="Free explore"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/></svg><span>Explore</span></button>
-  </nav>
-
-  <section class="sheet" id="sheet" aria-label="Race replay">
-    <div class="grab" id="grab" aria-hidden="true"><span></span></div>
-    <div class="transport" id="transport">
-      <button id="play" class="play" aria-label="Play"><svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.5v15l12.5-7.5z"/></svg><svg viewBox="0 0 24 24" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg></button>
-      <div class="clock"><output id="clock">0:00</output><span id="duration"></span></div>
-      <button id="speed" class="chip" aria-label="Replay speed">30×</button>
-      <button id="share" class="chip icon" aria-label="Share this moment"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M5 12v8h14v-8"/></svg></button>
-    </div>
-    <input id="scrub" class="scrub" type="range" min="0" max="1" step="1" value="0" aria-label="Race clock">
     <div class="profile"><svg id="profile" role="img" aria-label="Elevation profile with rider positions. Tap to jump the selected rider to that point."></svg></div>
-    <h2 class="sec" id="standings-title">Standings</h2>
-    <ol class="board" id="board"></ol>
-    <h2 class="sec">Telemetry · <span id="t-name"></span></h2>
     <div class="charts">
       <figure><figcaption>Power <small>W</small></figcaption><svg id="c-watts"></svg></figure>
       <figure><figcaption>Heart rate <small>bpm</small></figcaption><svg id="c-hr"></svg></figure>
@@ -67,6 +56,30 @@
     </div>
     <p class="credits" id="credits">Imagery © IGN / PNOA, CC BY 4.0 · Elevation: Mapzen / AWS Terrain Tiles · Road: MallorcaVelo GPX / © OpenStreetMap contributors (ODbL). Finite ~6 × 9 km terrain; its edges fade into haze. Riders and road drawn larger than life. Approximate segment boundaries. <span id="sim-note">All rider telemetry is simulated.</span></p>
   </section>
+
+  <!-- Every control lives here, in the thumb zone at the bottom (a side rail in landscape). -->
+  <div class="dock" id="dock">
+    <nav class="cams" id="cams" aria-label="Camera">
+      <button data-cam="follow" aria-label="Follow camera"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="7.5"/></svg><span>Follow</span></button>
+      <button data-cam="overview" aria-label="Overview camera"><svg viewBox="0 0 24 24"><path d="M2 20 9 8l4 6 3-4 6 10z"/><path d="m7.4 10.7 1.6 1.3 1.4-1.6"/></svg><span>Overview</span></button>
+      <button data-cam="side" aria-label="Side profile camera"><svg viewBox="0 0 24 24"><path d="M2 20h20"/><path d="M3 17.5 9 13l3.5 2L21 7.5"/><circle cx="12.5" cy="11.2" r="2"/></svg><span>Side</span></button>
+      <button id="reset" class="reset" aria-label="Reset view"><svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 3.5v4h4"/></svg><span>Reset</span></button>
+    </nav>
+    <div class="chips" id="chips" role="toolbar" aria-label="Riders">
+      <button class="chip-all" id="chip-all" aria-label="All riders, overview camera"><span>All</span></button>
+    </div>
+    <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Race clock" aria-valuemin="0">
+      <div class="scrub-track"><i class="scrub-fill"></i></div>
+      <div class="scrub-moments" id="moments"></div>
+      <div class="scrub-thumb"></div>
+      <div class="scrub-bubble" id="bubble" aria-hidden="true"><b></b><span></span></div>
+    </div>
+    <div class="transport" id="transport">
+      <div class="clock"><output id="clock">0:00</output><span id="duration"></span></div>
+      <button id="play" class="play" aria-label="Play"><svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.5v15l12.5-7.5z"/></svg><svg viewBox="0 0 24 24" class="i-pause"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg></button>
+      <button id="speed" class="speed" aria-label="Replay speed">16×</button>
+    </div>
+  </div>
 
   <div class="intro" id="intro" aria-hidden="true">
     <div class="intro-title"><span class="kicker">Wielki Wyścig</span><h2>Coll de sa Batalla</h2><p id="intro-meta"></p></div>

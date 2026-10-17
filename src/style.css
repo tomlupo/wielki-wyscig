@@ -84,6 +84,18 @@ svg { display: block; }
 .stats dd { margin: 3px 0 0; white-space: nowrap; }
 .stats b { font: 700 26px/1 var(--num); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
 .stats small { margin-left: 3px; color: var(--dim); font: 500 12px/1 var(--num); }
+/* Swipe the card sideways for the next / previous rider; the content follows the finger, then slides in. */
+.focus { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.focus-head, .stats { transform: translateX(var(--drag, 0px)); }
+.focus.slide-next .focus-head, .focus.slide-next .stats { animation: slide-next 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.focus.slide-prev .focus-head, .focus.slide-prev .stats { animation: slide-prev 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.focus.slide-next, .focus.slide-prev { animation: rider-glow 0.6s ease-out; }
+@keyframes slide-next { from { transform: translateX(36px); opacity: 0; } }
+@keyframes slide-prev { from { transform: translateX(-36px); opacity: 0; } }
+@keyframes rider-glow { from { box-shadow: inset 3px 0 0 var(--rider), 0 0 0 2px var(--rider), 0 10px 30px rgba(0, 0, 0, 0.25); } }
+.fnav { display: none; flex: none; place-items: center; width: 32px; height: 44px; margin: -8px -6px; border-radius: 10px; color: var(--dim); transition: color 0.2s, background 0.2s; }
+.fnav:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+.fnav svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- camera buttons ----------------------------------------------------------- */
 .cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 196px); display: flex; flex-direction: column; gap: 8px; }
@@ -284,6 +296,7 @@ svg { display: block; }
   .brand h1 { font-size: 40px; }
   .brand .meta { font-size: 14px; }
   .focus { top: auto; bottom: var(--gutter); right: auto; width: 440px; }
+  .fnav { display: grid; }
   .cams { top: auto; bottom: var(--gutter); right: calc(420px + 2 * var(--gutter)); flex-direction: row; }
   .cams button { width: auto; height: 46px; padding: 0 14px; grid-auto-flow: column; gap: 8px; }
   .cams span { display: inline; font: 600 13px/1 var(--num); letter-spacing: 0.12em; text-transform: uppercase; }

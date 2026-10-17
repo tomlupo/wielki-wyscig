@@ -187,10 +187,10 @@ async function boot() {
 
   // ---- 3D world ------------------------------------------------------------
   // Callbacks from the world can fire while it is still loading; they wait until the HUD is wired (`live`).
-  let world = null, live = false;
+  let world = null, live = false, pageDrag = null;
   try {
     const { createWorld } = await worldModule;
-    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i) });
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y) });
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
   } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
@@ -243,6 +243,37 @@ async function boot() {
     updateUi(true);
     pushState();
   }
+  // Next / previous rider by current race position, wrapping, so every rider is a few swipes away.
+  const focus = $('focus');
+  function stepRider(dir) {
+    const order = standings(riders, time).map(row => row.index);
+    select(order[(order.indexOf(selected) + dir + order.length) % order.length]);
+    focus.classList.remove('slide-next', 'slide-prev');
+    void focus.offsetWidth;
+    focus.classList.add(dir > 0 ? 'slide-next' : 'slide-prev');
+  }
+  $('f-prev').addEventListener('click', () => stepRider(-1));
+  $('f-next').addEventListener('click', () => stepRider(1));
+  let swipe = null;
+  focus.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    swipe = { x: e.clientX, y: e.clientY };
+    focus.setPointerCapture(e.pointerId);
+  });
+  focus.addEventListener('pointermove', e => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x;
+    if (Math.abs(dx) > Math.abs(e.clientY - swipe.y)) focus.style.setProperty('--drag', `${dx * 0.4}px`);
+  });
+  const endSwipe = e => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    focus.style.removeProperty('--drag');
+    if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) stepRider(dx < 0 ? 1 : -1);
+  };
+  focus.addEventListener('pointerup', endSwipe);
+  focus.addEventListener('pointercancel', endSwipe);
   $('cams').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setCam(b.dataset.cam); });
   $('play').addEventListener('click', () => setPlaying(!playing));
   $('speed').addEventListener('click', () => {
@@ -268,8 +299,8 @@ async function boot() {
     if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === 'ArrowRight') seek(time + 15);
     else if (e.key === 'ArrowLeft') seek(time - 15);
-    else if (e.key === ']') select((selected + 1) % riders.length);
-    else if (e.key === '[') select((selected + riders.length - 1) % riders.length);
+    else if (e.key === ']') stepRider(1);
+    else if (e.key === '[') stepRider(-1);
     else if (/^[1-4]$/.test(e.key)) setCam(CAMERAS[e.key - 1]);
   });
 
@@ -300,32 +331,48 @@ async function boot() {
     const h = snapHeights();
     placeSheet(sheet.offsetHeight - h[name], animate);
   }
+  function dragBegin(y) { dragStart = { y, sheetY, t: performance.now(), moved: false }; }
+  function dragMove(y) {
+    if (!dragStart) return;
+    const dy = y - dragStart.y;
+    if (Math.abs(dy) > 4) dragStart.moved = true;
+    placeSheet(dragStart.sheetY + dy, false);
+  }
+  function dragCancel() { if (dragStart) { dragStart = null; setSnap(snap); } }
+  function dragEnd(y) {
+    if (!dragStart) return;
+    const { moved, t } = dragStart, dy = y - dragStart.y, v = dy / Math.max(1, performance.now() - t);
+    dragStart = null;
+    const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
+    if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
+    const order = ['peek', 'half', 'full'];
+    let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
+    if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
+    setSnap(target);
+  }
   const grabZone = [$('grab'), $('transport')];
   for (const el of grabZone) {
     el.addEventListener('pointerdown', e => {
       if (desktop.matches || e.target.closest('button')) return;
-      dragStart = { y: e.clientY, sheetY, t: performance.now(), moved: false };
+      dragBegin(e.clientY);
       el.setPointerCapture(e.pointerId);
     });
-    el.addEventListener('pointermove', e => {
-      if (!dragStart) return;
-      const dy = e.clientY - dragStart.y;
-      if (Math.abs(dy) > 4) dragStart.moved = true;
-      placeSheet(dragStart.sheetY + dy, false);
-    });
-    el.addEventListener('pointerup', e => {
-      if (!dragStart) return;
-      const { y, moved, t } = dragStart, dy = e.clientY - y, v = dy / Math.max(1, performance.now() - t);
-      dragStart = null;
-      const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
-      if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
-      const order = ['peek', 'half', 'full'];
-      let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
-      if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
-      setSnap(target);
-    });
-    el.addEventListener('pointercancel', () => { dragStart = null; setSnap(snap); });
+    el.addEventListener('pointermove', e => dragMove(e.clientY));
+    el.addEventListener('pointerup', e => dragEnd(e.clientY));
+    el.addEventListener('pointercancel', dragCancel);
   }
+  // A one-finger vertical swipe over the map moves the sheet, as if the page scrolled.
+  // Returns false on 'start' when there is no sheet to move, so the swipe stays with the map.
+  pageDrag = (phase, y) => {
+    if (phase === 'start') {
+      if (desktop.matches || app.dataset.phase !== 'race') return false;
+      dragBegin(y);
+      hintOnce('ww-two-fingers', 'Two fingers to move the map');
+    } else if (phase === 'move') dragMove(y);
+    else if (phase === 'end') dragEnd(y);
+    else dragCancel();
+    return true;
+  };
   new ResizeObserver(() => { profileChart.resize(); charts.resize(); setSnap(snap, false); }).observe(sheet);
   desktop.addEventListener('change', () => setSnap(snap, false));
 
@@ -472,4 +519,12 @@ function toast(message, ms = 2600) {
   el.classList.add('in');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('in'), ms);
+}
+// A hint shown once per browser; storage can be blocked, then it shows once per visit.
+const hinted = new Set();
+function hintOnce(key, message) {
+  if (hinted.has(key)) return;
+  hinted.add(key);
+  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch {}
+  toast(message);
 }

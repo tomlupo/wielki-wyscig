@@ -21,3 +21,8 @@ test('invalid ordering and duplicate timestamps are rejected', () => {
   const data=structuredClone(race);data.riders[0].samples[1].t=0;
   assert.throws(()=>validateRace(data), /timestamps/);
 });
+
+test('published race data (data/race.json) passes the v1 contract', () => {
+  const live = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+  assert.doesNotThrow(() => validateRace(live));
+});

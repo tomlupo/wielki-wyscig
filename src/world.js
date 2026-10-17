@@ -434,10 +434,11 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   // Touch: one finger swiping vertically belongs to the page (the race sheet, via onPageDrag),
   // so the standings are always one swipe away; two fingers move the map. A sideways one-finger
   // swipe still turns the camera. Mouse and pen keep the full one-button map controls.
+  // When the page declines the drag (no sheet to move), the swipe goes to the map as before.
   const pointers = new Map();
-  let pinch = 0, mid = null, lastTap = 0, dragged = 0, touchAxis = null, touchStart = null;
+  let pinch = 0, mid = null, lastTap = 0, dragged = 0, touchAxis = null, touchStart = null, pageY = 0;
   const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
-  const endPageDrag = y => { if (touchAxis === 'y') onPageDrag?.('end', y); touchAxis = 'map'; };
+  const endPageDrag = phase => { if (touchAxis === 'y') onPageDrag?.(phase, pageY); touchAxis = 'map'; };
   canvas.addEventListener('pointerdown', e => {
     if (rig.intro) { skipIntro(); return; }
     pointers.set(e.pointerId, [e.clientX, e.clientY]);
@@ -446,7 +447,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     rig.lastInput = performance.now();
     if (pointers.size === 1) { touchAxis = e.pointerType === 'touch' ? null : 'map'; touchStart = [e.clientX, e.clientY]; }
     if (pointers.size === 2) {
-      endPageDrag(e.clientY);
+      endPageDrag('end');
       const [a, b] = [...pointers.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     }
   });
@@ -469,17 +470,17 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       const tx = e.clientX - touchStart[0], ty = e.clientY - touchStart[1];
       if (Math.hypot(tx, ty) < 10) return;
       touchAxis = Math.abs(ty) > Math.abs(tx) ? 'y' : 'x';
-      if (touchAxis === 'y') onPageDrag?.('start', touchStart[1]);
+      if (touchAxis === 'y' && !onPageDrag?.('start', pageY = touchStart[1])) touchAxis = 'map';
     }
-    if (touchAxis === 'y') onPageDrag?.('move', e.clientY);
+    if (touchAxis === 'y') onPageDrag('move', pageY = e.clientY);
     else if (touchAxis === 'x') rotate(dx, 0);
     else if (e.shiftKey || e.buttons === 2) pan(dx, dy);
     else rotate(dx, dy);
   });
   const release = e => {
-    pointers.delete(e.pointerId);
+    if (!pointers.delete(e.pointerId)) return; // e.g. the tap that skipped the intro
     pinch = 0; mid = null;
-    if (!pointers.size) endPageDrag(e.clientY);
+    if (!pointers.size) endPageDrag(e.type === 'pointerup' ? 'end' : 'cancel');
     if (e.type === 'pointerup' && dragged < 8) {
       const now = performance.now();
       if (now - lastTap < 320) doubleTap(e);

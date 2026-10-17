@@ -338,6 +338,7 @@ async function boot() {
     if (Math.abs(dy) > 4) dragStart.moved = true;
     placeSheet(dragStart.sheetY + dy, false);
   }
+  function dragCancel() { if (dragStart) { dragStart = null; setSnap(snap); } }
   function dragEnd(y) {
     if (!dragStart) return;
     const { moved, t } = dragStart, dy = y - dragStart.y, v = dy / Math.max(1, performance.now() - t);
@@ -358,14 +359,19 @@ async function boot() {
     });
     el.addEventListener('pointermove', e => dragMove(e.clientY));
     el.addEventListener('pointerup', e => dragEnd(e.clientY));
-    el.addEventListener('pointercancel', () => { dragStart = null; setSnap(snap); });
+    el.addEventListener('pointercancel', dragCancel);
   }
   // A one-finger vertical swipe over the map moves the sheet, as if the page scrolled.
+  // Returns false on 'start' when there is no sheet to move, so the swipe stays with the map.
   pageDrag = (phase, y) => {
-    if (desktop.matches || app.dataset.phase !== 'race') return;
-    if (phase === 'start') { dragBegin(y); hintOnce('ww-two-fingers', 'Two fingers to move the map'); }
-    else if (phase === 'move') dragMove(y);
-    else dragEnd(y);
+    if (phase === 'start') {
+      if (desktop.matches || app.dataset.phase !== 'race') return false;
+      dragBegin(y);
+      hintOnce('ww-two-fingers', 'Two fingers to move the map');
+    } else if (phase === 'move') dragMove(y);
+    else if (phase === 'end') dragEnd(y);
+    else dragCancel();
+    return true;
   };
   new ResizeObserver(() => { profileChart.resize(); charts.resize(); setSnap(snap, false); }).observe(sheet);
   desktop.addEventListener('change', () => setSnap(snap, false));

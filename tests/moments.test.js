@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { detectMoments } from '../src/moments.js';
 
-const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+const race = JSON.parse(readFileSync(new URL('./fixtures/sample-race.json', import.meta.url)));
 const { route } = JSON.parse(readFileSync(new URL('../public/terrain.json', import.meta.url)));
 
 test('moments of the sample race tell its story in order', () => {
@@ -32,5 +32,13 @@ test('moments are sorted, inside the race, spaced apart and capped', () => {
       assert.ok(m.t >= 0 && m.t <= duration);
       if (i) assert.ok(m.t - moments[i - 1].t >= duration * 0.03);
     });
+  }
+});
+
+test('the scrubber never names the same new leader twice in a row (sample and live race)', () => {
+  const live = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+  for (const { riders } of [race, live]) {
+    const leads = detectMoments(riders, route).filter(m => m.kind === 'lead' || /new leader/.test(m.label));
+    leads.forEach((m, i) => { if (i) assert.notEqual(m.rider, leads[i - 1].rider, m.label); });
   }
 });

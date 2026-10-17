@@ -10,7 +10,7 @@ import { mkdirSync } from 'node:fs';
 const base = process.argv[2] || 'http://localhost:4173';
 const shots = process.argv[3];
 if (shots) mkdirSync(shots, { recursive: true });
-const URL_ = `${base}/?t=900&r=B&cam=follow&debug`;
+const URL_ = `${base}/?t=900&cam=follow&debug`;
 let failures = 0;
 const results = [];
 async function check(name, fn) {
@@ -179,9 +179,11 @@ async function tap(page, selector) {
     }
   });
   await check('rider chip: tap follows, tap again releases to free orbit, All = overview', async () => {
-    const chipA = '.chip-rider:has(.letter:text-is("A"))';
+    // Any rider other than the selected one: the suite runs on whatever race /api/race serves.
+    const other = await page.evaluate(() => { const w = window.wielkiWyscig; return w.riders.find((_, i) => i !== w.selected); });
+    const chipA = `.chip-rider:has(.letter:text-is("${other.letter}"))`;
     await tap(page, chipA);
-    assert.equal((await query(page)).r, 'A');
+    assert.equal((await query(page)).r, other.id);
     assert.equal(await page.locator(chipA).getAttribute('aria-pressed'), 'true');
     await shot(page, 'phone-chip-follow');
     await tap(page, chipA);
@@ -193,13 +195,16 @@ async function tap(page, selector) {
     await tap(page, '.cams [data-cam=follow]');
   });
   await check('scrubber: tap near a race moment lands on it', async () => {
+    // The marker with the most room around it, so the tap can only mean that one.
     const m = await page.evaluate(() => {
-      const el = document.querySelector('.moment[data-kind=gap]'), r = el.getBoundingClientRect();
-      return { x: r.left + r.width / 2 + 9, y: r.top + r.height / 2 };
+      const marks = [...document.querySelectorAll('.moment')].map((el, i) => { const r = el.getBoundingClientRect(); return { i, x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+      const room = k => Math.min(...marks.filter(o => o !== k).map(o => Math.abs(o.x - k.x)));
+      const best = marks.reduce((a, b) => room(b) > room(a) ? b : a);
+      return { x: best.x + 9, y: best.y, t: window.wielkiWyscig.moments[best.i].t };
     });
     await page.touchscreen.tap(m.x, m.y);
     await page.waitForTimeout(300);
-    assert.equal(await page.evaluate(() => window.wielkiWyscig.time), 745);
+    assert.equal(await page.evaluate(() => window.wielkiWyscig.time), m.t);
   });
   await check('scrubber: sideways drag seeks with a time/km bubble and snaps to the finish', async () => {
     const box = await page.locator('#scrub').boundingBox(), y = box.y + box.height / 2;
@@ -215,7 +220,7 @@ async function tap(page, selector) {
     await page.waitForTimeout(300);
     assert.ok(bubble.on, 'bubble hidden while dragging');
     assert.match(bubble.text, /^\d+:\d\d\n.{4,}/);
-    assert.equal(await page.evaluate(() => window.wielkiWyscig.time), 1560, 'did not snap to the finish');
+    assert.equal(await page.evaluate(() => window.wielkiWyscig.time), await page.evaluate(() => window.wielkiWyscig.moments.at(-1).t), 'did not snap to the finish');
     await page.evaluate(() => { document.getElementById('podium').hidden = true; });
   });
   await check('vertical swipe that starts on the scrubber scrolls the page, does not seek', async () => {
@@ -302,15 +307,23 @@ async function tap(page, selector) {
     assert.ok(moved(before, await camera(page)) > 5, 'camera did not move');
   });
   await check('desktop: buttons and keys work', async () => {
-    await page.click('#play');
+    // Like a person: the pointer travels to the button first, which wakes a dock that hid during playback.
+    const click = async selector => {
+      const box = await page.locator(selector).first().boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+      await page.waitForTimeout(400);
+      await page.click(selector);
+    };
+    await click('#play');
     assert.ok(await page.evaluate(() => document.getElementById('app').classList.contains('playing')));
-    await page.click('#play');
-    await page.click('.cams [data-cam=side]');
+    await click('#play');
+    await click('.cams [data-cam=side]');
     assert.equal((await query(page)).cam, 'side');
     await page.keyboard.press('2');
     assert.equal((await query(page)).cam, 'overview');
-    await page.click('.chip-rider:has(.letter:text-is("C"))');
-    assert.equal((await query(page)).r, 'C');
+    const other = await page.evaluate(() => { const w = window.wielkiWyscig; return w.riders.find((_, i) => i !== w.selected); });
+    await click(`.chip-rider:has(.letter:text-is("${other.letter}"))`);
+    assert.equal((await query(page)).r, other.id);
     assert.equal((await query(page)).cam, 'follow');
   });
   await check('desktop: the page itself does not scroll', async () => {

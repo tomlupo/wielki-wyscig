@@ -98,7 +98,7 @@ async function boot() {
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
     world.onHint(showHint);
     // ?debug exposes the live state to the browser tests (tests/e2e).
-    if (new URLSearchParams(location.search).has('debug')) window.wielkiWyscig = { world, get time() { return time; }, get cam() { return camMode; } };
+    if (new URLSearchParams(location.search).has('debug')) window.wielkiWyscig = { world, moments, riders: riders.map(r => ({ id: r.id, letter: r.letter })), duration, get time() { return time; }, get cam() { return camMode; }, get selected() { return selected; } };
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
   } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
   if (!world) {

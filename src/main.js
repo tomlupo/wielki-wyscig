@@ -4,14 +4,10 @@ import { elevationProfile, climbStats, gradeAt, gradeColor } from './profile.js'
 import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
 import { loadRace } from './data/source.js';
 import { renderProfile, createCharts } from './charts.js';
-import { detectMoments } from './moments.js';
-import { createScrubber } from './scrubber.js';
 
 const $ = id => document.getElementById(id);
 const app = $('app');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const PRESETS = CAMERAS.slice(0, 3); // follow, overview, side; 'free' is where gestures leave the camera
-const CHIP_RIDERS = 5; // the rider row shows the top five (plus the selected rider)
 
 boot().catch(error => {
   console.error(error);
@@ -54,12 +50,11 @@ async function boot() {
   const route = terrain.route, len = route.at(-1)[3];
   const stats = climbStats(route), profile = elevationProfile(route);
   const distanceAt = (i, t) => interpolate(riders[i].samples, t, 'd');
-  const moments = detectMoments(riders, route);
 
   const initial = parseState(location.search, { riderIds: riders.map(r => r.id), duration });
   let time = initial.t, speed = initial.speed, playing = false, finishedShown = false;
   let selected = Math.max(0, riders.findIndex(r => r.id === initial.rider));
-  let camMode = initial.cam, lastPreset = PRESETS.includes(camMode) ? camMode : 'follow';
+  let camMode = initial.cam;
 
   // ---- static text --------------------------------------------------------
   const km = (stats.length / 1000).toFixed(1);
@@ -68,37 +63,28 @@ async function boot() {
   $('badge-text').textContent = race.simulated ? 'Simulated' : 'Recorded';
   if (!race.simulated) $('sim-note').textContent = 'Recorded telemetry; missing sensor values are shown as —.';
   $('duration').textContent = '/ ' + formatClock(duration);
+  const scrub = $('scrub');
+  scrub.max = String(Math.ceil(duration));
   $('speed').textContent = speed + '×';
 
-  // ---- standings board and rider chips ---------------------------------------
-  const board = $('board'), chips = $('chips');
+  // ---- standings board ------------------------------------------------------
+  const board = $('board');
   const rows = riders.map((r, i) => {
     const li = document.createElement('li');
     li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
     li.querySelector('.nm').textContent = r.name;
     li.querySelector('button').addEventListener('click', () => followRider(i));
     board.append(li);
-    const chip = document.createElement('button');
-    chip.className = 'chip-rider';
-    chip.style.setProperty('--c', r.color);
-    chip.innerHTML = `<b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span>`;
-    chip.querySelector('.nm').textContent = r.name;
-    chip.addEventListener('click', () => tapRider(i));
-    chips.append(chip);
-    return { li, rank: li.querySelector('.rank'), gap: li.querySelector('.gap'), sens: li.querySelector('.sens'), prog: li.querySelector('.prog i'), btn: li.querySelector('button'), chip, chipGap: chip.querySelector('.gap') };
+    return { li, rank: li.querySelector('.rank'), gap: li.querySelector('.gap'), sens: li.querySelector('.sens'), prog: li.querySelector('.prog i'), btn: li.querySelector('button') };
   });
-  $('chip-all').addEventListener('click', () => setCam('overview'));
 
   // ---- 3D world ------------------------------------------------------------
   // Callbacks from the world can fire while it is still loading; they wait until the HUD is wired (`live`).
   let world = null, live = false;
   try {
     const { createWorld } = await worldModule;
-    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && tapRider(i) });
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i) });
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
-    world.onHint(showHint);
-    // ?debug exposes the live state to the browser tests (tests/e2e).
-    if (new URLSearchParams(location.search).has('debug')) window.wielkiWyscig = { world, moments, riders: riders.map(r => ({ id: r.id, letter: r.letter })), duration, get time() { return time; }, get cam() { return camMode; }, get selected() { return selected; } };
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
   } catch (error) { console.error(error); world = null; } // no WebGL: the HUD still works over a still image
   if (!world) {
@@ -111,7 +97,6 @@ async function boot() {
   setProgress(1);
 
   // ---- controls ---------------------------------------------------------------
-  const chasing = () => camMode === 'follow' || camMode === 'side';
   function select(i) {
     selected = i;
     world?.select(i);
@@ -121,35 +106,21 @@ async function boot() {
     updateUi(true);
     pushState(true);
   }
-  // From the standings or the scrubber: watch this rider, keeping a rider camera if one is on.
+  // Picking a rider from the board or a 3D label: keep a rider camera, leave the map views for Follow.
   function followRider(i) {
     select(i);
-    if (!chasing()) setCam('follow');
-    syncCams();
-  }
-  // A rider chip or 3D label: the first tap follows, a second tap lets the camera go (free orbit).
-  function tapRider(i) {
-    if (i === selected && chasing()) setCam('free');
-    else followRider(i);
+    if (camMode !== 'pov') setCam('follow');
   }
   function setCam(mode) {
     if (!world || !CAMERAS.includes(mode)) return;
     if (world.introRunning) world.skipIntro(); // ends the intro through its onDone, so the race still starts
     camMode = mode;
-    if (PRESETS.includes(mode)) lastPreset = mode;
     world.setMode(mode);
     syncCams();
     pushState(true);
   }
-  function resetView() { setCam(camMode === 'free' ? lastPreset : camMode); }
   function syncCams() {
-    for (const b of $('cams').querySelectorAll('button[data-cam]')) b.setAttribute('aria-pressed', String(b.dataset.cam === camMode));
-    $('chip-all').setAttribute('aria-pressed', String(camMode === 'overview'));
-    rows.forEach((r, i) => {
-      // Followed: filled in the rider's colour. Selected but released: an outline only.
-      r.chip.setAttribute('aria-pressed', String(i === selected && chasing()));
-      r.chip.classList.toggle('selected', i === selected);
-    });
+    for (const b of $('cams').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.cam === camMode));
   }
   function setPlaying(on) {
     if (on && time >= duration) { time = 0; finishedShown = false; }
@@ -157,7 +128,6 @@ async function boot() {
     app.classList.toggle('playing', on);
     $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
     if (!on) pushState(true);
-    wake();
   }
   function seek(t) {
     time = Math.max(0, Math.min(duration, t));
@@ -165,14 +135,14 @@ async function boot() {
     updateUi(true);
     pushState();
   }
-  $('cams').addEventListener('click', e => { const b = e.target.closest('button[data-cam]'); if (b) setCam(b.dataset.cam); });
-  $('reset').addEventListener('click', resetView);
+  $('cams').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setCam(b.dataset.cam); });
   $('play').addEventListener('click', () => setPlaying(!playing));
   $('speed').addEventListener('click', () => {
     speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
     $('speed').textContent = speed + '×';
     pushState(true);
   });
+  scrub.addEventListener('input', () => seek(+scrub.value));
   $('share').addEventListener('click', async () => {
     pushState(true);
     const url = location.href;
@@ -185,91 +155,69 @@ async function boot() {
   $('podium-close').addEventListener('click', () => { $('podium').hidden = true; });
   addEventListener('keydown', e => {
     if (e.target.closest('input,select,textarea') && e.key !== ' ') return;
-    if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); setPlaying(!playing); }
+    if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === 'ArrowRight') seek(time + 15);
     else if (e.key === 'ArrowLeft') seek(time - 15);
     else if (e.key === ']') select((selected + 1) % riders.length);
     else if (e.key === '[') select((selected + riders.length - 1) % riders.length);
-    else if (/^[1-3]$/.test(e.key)) setCam(PRESETS[e.key - 1]);
-    else if (e.key === 'r' || e.key === '0') resetView();
-  });
-
-  // Scrubbing pauses the race under the finger and resumes it on release.
-  let resumeAfterDrag = false;
-  const scrubber = createScrubber($('scrub'), {
-    duration, moments, onSeek: seek, clock: formatClock,
-    describe: t => {
-      const lead = standings(riders, t)[0];
-      return { time: formatClock(t), place: `km ${(lead.d / 1000).toFixed(1)} · ${riders[lead.index].name} ${lead.finished ? 'wins' : 'leads'}` };
-    },
-    onDrag: on => {
-      if (on) { resumeAfterDrag = playing; if (playing) setPlaying(false); }
-      else if (resumeAfterDrag && time < duration) setPlaying(true); // dragged to the end: stay there, do not restart
-    },
+    else if (/^[1-4]$/.test(e.key)) setCam(CAMERAS[e.key - 1]);
   });
 
   const profileChart = renderProfile($('profile'), profile, len, riders, d => seek(timeAtDistance(riders[selected].samples, d)));
   const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration);
 
-  // ---- sheet and dock ------------------------------------------------------------
-  // On a phone the page scrolls: the sheet sits in the flow under a spacer as tall as
-  // the map, and CSS scroll snapping holds it at peek, half (standings) and full.
-  const sheet = $('sheet'), dock = $('dock'), root = document.documentElement;
+  // ---- bottom sheet -------------------------------------------------------------
+  const sheet = $('sheet');
   const desktop = matchMedia('(min-width: 960px)');
-  const safeTop = () => parseFloat(getComputedStyle(root).scrollPaddingTop) || 0;
-  function snapPoints() {
-    const top = sheet.getBoundingClientRect().top + scrollY;
-    const half = $('board').getBoundingClientRect().bottom + scrollY - (innerHeight - dock.offsetHeight) + 8;
-    return { peek: 0, half: Math.max(0, Math.min(half, top)), full: Math.max(0, top - safeTop()) };
+  let snap = 'peek', sheetY = 0, dragStart = null;
+  function snapHeights() {
+    const top = sheet.getBoundingClientRect().top - sheetY;
+    const peek = $('standings-title').getBoundingClientRect().top - sheetY - top;
+    const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
+    return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }
-  $('grab').addEventListener('click', () => {
-    if (desktop.matches) return;
-    const s = snapPoints(), y = scrollY;
-    const target = y < s.half - 10 ? s.half : y < s.full - 10 ? s.full : s.peek;
-    scrollTo({ top: target, behavior: reducedMotion ? 'auto' : 'smooth' });
-  });
-  function measure() {
-    // The dock height is measured with every row showing; while reading, rows fold away without moving the sheet.
-    if (!app.classList.contains('reading')) root.style.setProperty('--dock-h', `${dock.offsetHeight}px`);
-    root.style.setProperty('--peek-h', `${$('peek').offsetHeight}px`);
-    world?.setInsetRight(desktop.matches ? innerWidth - sheet.getBoundingClientRect().left : 0);
+  function placeSheet(y, animate = true) {
+    sheetY = Math.max(0, y);
+    sheet.style.transition = animate ? '' : 'none';
+    sheet.style.transform = desktop.matches ? '' : `translate3d(0,${sheetY}px,0)`;
+    app.style.setProperty('--sheet-visible', desktop.matches ? '0px' : `${sheet.offsetHeight - sheetY}px`);
   }
-  function onScroll() {
-    const reading = !desktop.matches && sheet.getBoundingClientRect().top < innerHeight * 0.42;
-    if (reading !== app.classList.contains('reading')) app.classList.toggle('reading', reading);
-    $('grab').setAttribute('aria-expanded', String(!desktop.matches && scrollY > 40));
+  function setSnap(name, animate = true) {
+    snap = name;
+    sheet.dataset.snap = name;
+    world?.setInsetRight(desktop.matches ? innerWidth - sheet.offsetLeft : 0);
+    if (desktop.matches) return placeSheet(0, false);
+    const h = snapHeights();
+    placeSheet(sheet.offsetHeight - h[name], animate);
   }
-  addEventListener('scroll', () => { onScroll(); wake(); }, { passive: true });
-  new ResizeObserver(() => { profileChart.resize(); charts.resize(); measure(); }).observe(sheet);
-  new ResizeObserver(measure).observe(dock);
-  desktop.addEventListener('change', () => { measure(); onScroll(); });
-
-  // ---- chrome: hide after 3 s idle while playing, any tap brings it back --------------
-  let idleTimer = 0, swallowClick = false;
-  function wake() {
-    if (app.classList.contains('chrome-off')) app.classList.remove('chrome-off');
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      const busy = !playing || app.dataset.phase !== 'race' || scrollY > 8 || !$('podium').hidden || scrubber.dragging || document.querySelector('.dock :focus-visible');
-      if (!busy) app.classList.add('chrome-off');
-    }, 3000);
+  const grabZone = [$('grab'), $('transport')];
+  for (const el of grabZone) {
+    el.addEventListener('pointerdown', e => {
+      if (desktop.matches || e.target.closest('button')) return;
+      dragStart = { y: e.clientY, sheetY, t: performance.now(), moved: false };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', e => {
+      if (!dragStart) return;
+      const dy = e.clientY - dragStart.y;
+      if (Math.abs(dy) > 4) dragStart.moved = true;
+      placeSheet(dragStart.sheetY + dy, false);
+    });
+    el.addEventListener('pointerup', e => {
+      if (!dragStart) return;
+      const { y, moved, t } = dragStart, dy = e.clientY - y, v = dy / Math.max(1, performance.now() - t);
+      dragStart = null;
+      const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
+      if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
+      const order = ['peek', 'half', 'full'];
+      let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
+      if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
+      setSnap(target);
+    });
+    el.addEventListener('pointercancel', () => { dragStart = null; setSnap(snap); });
   }
-  addEventListener('pointerdown', () => {
-    // The tap that brings the chrome back does nothing else.
-    if (app.classList.contains('chrome-off')) { swallowClick = true; setTimeout(() => { swallowClick = false; }, 600); }
-    wake();
-  }, true);
-  addEventListener('click', e => { if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); } }, true);
-  addEventListener('pointermove', e => { if (e.pointerType === 'mouse') wake(); }, { passive: true });
-  addEventListener('keydown', wake, true);
-
-  let hintTimer = 0;
-  function showHint() {
-    if (!live || app.dataset.phase !== 'race') return;
-    $('hint').classList.add('in');
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => $('hint').classList.remove('in'), 1500);
-  }
+  new ResizeObserver(() => { profileChart.resize(); charts.resize(); setSnap(snap, false); }).observe(sheet);
+  desktop.addEventListener('change', () => setSnap(snap, false));
 
   // ---- URL state -----------------------------------------------------------------
   let lastPush = 0;
@@ -293,30 +241,16 @@ async function boot() {
     for (const row of table) byIndex[row.index] = row;
     table.forEach((row, n) => {
       const r = rows[row.index], tel = telemetryAt(riders[row.index].samples, time);
-      const gap = row.finished ? (row.rank === 1 ? formatClock(row.finish) : formatGap(row.gap)) : row.rank === 1 ? 'Leader' : formatGap(row.gap);
       r.li.style.order = n;
       r.btn.setAttribute('aria-pressed', String(row.index === selected));
       r.rank.textContent = row.rank;
-      r.gap.textContent = gap;
+      r.gap.textContent = row.finished ? (row.rank === 1 ? formatClock(row.finish) : formatGap(row.gap)) : row.rank === 1 ? 'Leader' : formatGap(row.gap);
       r.sens.textContent = row.finished ? 'Finished' : `${tel.watts ?? '—'} W · ${tel.hr ?? '—'} bpm`;
       r.prog.style.transform = `scaleX(${row.d / len})`;
-      r.chip.style.order = n;
-      r.chip.hidden = n >= CHIP_RIDERS && row.index !== selected;
-      r.chipGap.textContent = row.rank === 1 ? (row.finished ? 'Won' : 'Lead') : formatGap(row.gap);
     });
     const me = byIndex[selected], tel = telemetryAt(riders[selected].samples, time), rider = riders[selected];
-    const lead = table[0], leader = riders[lead.index], second = table[1];
-    text('p-letter', leader.letter);
-    $('p-letter').style.setProperty('--c', leader.color);
-    text('p-name', leader.name);
-    text('p-note', lead.finished ? `wins · ${formatClock(lead.finish)}` : 'leads');
-    if (lead.index !== selected) {
-      text('p-gap', formatGap(me.gap));
-      text('p-gap-note', `${rider.name} · P${me.rank}`);
-    } else {
-      text('p-gap', second ? formatGap(second.gap) : '—');
-      text('p-gap-note', second ? `to ${riders[second.index].name}` : '');
-    }
+    text('f-letter', rider.letter);
+    text('f-name', rider.name);
     text('f-pos', me.finished ? `Finished P${me.rank} · ${formatClock(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
     text('f-togo', ((len - me.d) / 1000).toFixed(2));
     text('f-w', me.finished ? '—' : String(tel.watts ?? '—'));
@@ -326,7 +260,8 @@ async function boot() {
     text('f-g', grade.toFixed(1));
     $('f-g').style.color = `rgb(${gradeColor(grade)})`;
     text('clock', formatClock(time));
-    scrubber.update(time);
+    scrub.value = String(Math.round(time));
+    scrub.style.setProperty('--p', (time / duration * 100).toFixed(2) + '%');
     profileChart.update(riders.map((_, i) => distanceAt(i, time)), selected);
     charts.cursor(time);
     app.classList.toggle('finished', me.finished);
@@ -353,9 +288,8 @@ async function boot() {
       onDone: () => {
         app.dataset.phase = 'race';
         app.classList.remove('intro-titled');
-        scrollTo(0, 0);
-        measure();
-        camMode = 'follow'; lastPreset = 'follow'; syncCams();
+        setSnap(snap, false);
+        camMode = 'follow'; syncCams();
         const go = $('go'); go.classList.add('in'); setTimeout(() => go.classList.remove('in'), 1100);
         setTimeout(() => setPlaying(true), 450);
       },
@@ -401,7 +335,7 @@ async function boot() {
   live = true;
   select(selected);
   syncCams();
-  measure();
+  setSnap('peek', false);
   updateUi(true);
   requestAnimationFrame(tick);
   app.dataset.phase = 'ready';
@@ -411,7 +345,6 @@ async function boot() {
     world.setMode(camMode);
     syncCams();
     app.dataset.phase = 'race';
-    measure();
     if (!initial.shared) setPlaying(true);
   } else runIntro();
 }

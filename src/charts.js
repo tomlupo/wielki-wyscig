@@ -32,15 +32,11 @@ export function renderProfile(svgEl, profile, len, riders, onSeek) {
       g.append('text').attr('dy', 3.2).text(r.letter);
       return g;
     });
-    // A tap or a sideways drag seeks; a vertical swipe stays the page's (touch-action: pan-y).
-    const seekAt = event => onSeek(Math.max(0, Math.min(len, x.invert(pointer(event)[0]))));
-    let down = null;
     svg.append('rect').attr('class', 'p-hit').attr('x', 0).attr('y', 0).attr('width', w).attr('height', h)
-      .on('click', seekAt)
-      .on('pointerdown', event => { down = [event.clientX, event.clientY]; })
-      .on('pointerup pointercancel', () => { down = null; })
-      .on('pointermove', event => {
-        if (down && event.buttons && Math.abs(event.clientX - down[0]) > Math.max(6, Math.abs(event.clientY - down[1]))) seekAt(event);
+      .on('pointerdown pointermove', event => {
+        if (event.type === 'pointermove' && !event.buttons) return;
+        event.preventDefault();
+        onSeek(Math.max(0, Math.min(len, x.invert(pointer(event)[0]))));
       });
   }
   const eleAt = d => {

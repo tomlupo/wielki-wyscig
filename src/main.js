@@ -248,6 +248,7 @@ async function boot() {
   }
   function syncCams() {
     for (const b of $('cams').querySelectorAll('button')) b.setAttribute('aria-pressed', String(auto ? b.dataset.cam === 'auto' : b.dataset.cam === camMode));
+    app.classList.toggle('tv', auto);
   }
   // ---- auto "TV" camera: the director cuts; any manual camera or rider choice hands control back ----
   function setAuto(on) {
@@ -506,13 +507,16 @@ async function boot() {
   }
 
   // ---- loop ------------------------------------------------------------------------------
-  let last = performance.now();
+  let last = performance.now(), slow = 1;
   function tick(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (playing) {
       const from = time;
-      time = Math.min(duration, time + dt * speed);
+      // The TV camera eases into slow motion around the big moments; a manual camera always plays at the set speed.
+      slow += ((auto && !reducedMotion ? director.slowmo(time, speed) : 1) - slow) * Math.min(1, dt * 4);
+      app.classList.toggle('slowmo', slow < 0.7);
+      time = Math.min(duration, time + dt * speed * slow);
       const crossed = events.findLast(e => e.t > from && e.t <= time);
       if (crossed) auto ? lowerThird(crossed.text, riders[crossed.rider].color) : toast(crossed.text, 2500);
       const met = moments.findLast(m => m.t > from && m.t <= time);

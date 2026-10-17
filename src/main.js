@@ -386,7 +386,11 @@ async function boot() {
     sheet.dataset.snap = name;
     world?.setInsetRight(desktop.matches ? innerWidth - sheet.offsetLeft : 0);
     if (desktop.matches) return placeSheet(0, false);
+    // Below full the content does not scroll: back to its top, where the half snap expects the standings.
+    if (name !== 'full') $('sheet-body').scrollTop = 0;
     const h = snapHeights();
+    // On a short screen the standings do not fit in half: the sheet opens full, where the content scrolls.
+    if (name === 'half' && h.half >= h.full - 1) snap = sheet.dataset.snap = name = 'full';
     placeSheet(sheet.offsetHeight - h[name], animate);
   }
   function dragBegin(y) { dragStart = { y, sheetY, t: performance.now(), moved: false }; }
@@ -403,9 +407,9 @@ async function boot() {
     dragStart = null;
     const h = snapHeights(), visible = sheet.offsetHeight - sheetY;
     if (!moved) return setSnap(snap === 'peek' ? 'half' : 'peek');
-    const order = ['peek', 'half', 'full'];
+    const order = h.half >= h.full - 1 ? ['peek', 'full'] : ['peek', 'half', 'full'];
     let target = order.reduce((best, n) => Math.abs(h[n] - visible) < Math.abs(h[best] - visible) ? n : best, 'peek');
-    if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(2, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
+    if (Math.abs(v) > 0.5) target = order[Math.max(0, Math.min(order.length - 1, order.indexOf(snap) + (v < 0 ? 1 : -1)))];
     setSnap(target);
   }
   const grabZone = [$('grab'), $('transport')];
@@ -419,6 +423,32 @@ async function boot() {
     el.addEventListener('pointerup', e => dragEnd(e.clientY));
     el.addEventListener('pointercancel', dragCancel);
   }
+  // The content under the scrubber scrolls natively once the sheet is fully open. Until then its bottom is off
+  // screen, so a swipe there moves the sheet; when full, so does a pull down from the top of the content.
+  // The direction of the first move decides: after it, a browser no longer lets a scroll be cancelled.
+  const body = $('sheet-body');
+  let bodyTouch = null;
+  body.addEventListener('touchstart', e => {
+    const own = desktop.matches || e.touches.length !== 1 || e.target.closest('.profile svg');
+    bodyTouch = own ? null : { y: e.touches[0].clientY, mode: null };
+  }, { passive: true });
+  body.addEventListener('touchmove', e => {
+    if (!bodyTouch) return;
+    const y = e.touches[0].clientY, dy = y - bodyTouch.y;
+    if (!bodyTouch.mode) {
+      if (!dy) return;
+      bodyTouch.mode = snap !== 'full' || (dy > 0 && body.scrollTop <= 0) ? 'sheet' : 'scroll';
+      if (bodyTouch.mode === 'sheet') dragBegin(bodyTouch.y);
+    }
+    if (bodyTouch.mode !== 'sheet') return;
+    e.preventDefault();
+    dragMove(y);
+  }, { passive: false });
+  body.addEventListener('touchend', e => {
+    if (bodyTouch?.mode === 'sheet') dragStart?.moved ? dragEnd(e.changedTouches[0].clientY) : dragCancel();
+    bodyTouch = null;
+  });
+  body.addEventListener('touchcancel', () => { if (bodyTouch?.mode === 'sheet') dragCancel(); bodyTouch = null; });
   // A one-finger vertical swipe over the map moves the sheet, as if the page scrolled.
   // Returns false on 'start' when there is no sheet to move, so the swipe stays with the map.
   pageDrag = (phase, y) => {

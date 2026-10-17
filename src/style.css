@@ -120,7 +120,9 @@ svg { display: block; }
   background: rgba(13, 17, 15, 0.86); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
   transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.25, 1); will-change: transform; overflow: hidden; }
-.sheet[data-snap='full'] { overflow-y: auto; overscroll-behavior: contain; }
+/* The handle, player bar and scrubber stay put; everything under them scrolls with one finger in any snap. */
+.sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .grab { flex: none; height: 22px; display: grid; place-items: center; touch-action: none; cursor: grab; }
 .grab span { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.28); }
 .transport { flex: none; display: flex; align-items: center; gap: 10px; touch-action: none; }
@@ -244,7 +246,9 @@ svg { display: block; }
 .intro-cap { position: absolute; left: var(--gutter); right: var(--gutter); bottom: calc(var(--safe-b) + 108px); text-align: center; font: 700 24px/1.1 var(--num); text-transform: uppercase; letter-spacing: 0.08em; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7); opacity: 0; transform: translateY(8px); }
 .intro-cap.in { animation: cap 2.6s both; }
 @keyframes cap { 0% { opacity: 0; transform: translateY(8px); } 18%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
-.skip { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 36px); translate: -50% 0; pointer-events: auto; height: 44px; padding: 0 20px; border-radius: 22px; background: var(--glass); border: 1px solid var(--line); font: 600 13px/1 var(--num); letter-spacing: 0.18em; text-transform: uppercase; }
+.skip { position: absolute; left: 50%; bottom: calc(var(--safe-b) + 36px); translate: -50% 0; pointer-events: none; height: 44px; padding: 0 20px; border-radius: 22px; background: var(--glass); border: 1px solid var(--line); font: 600 13px/1 var(--num); letter-spacing: 0.18em; text-transform: uppercase; }
+/* Only while the intro plays: invisible after it, the button would sit on the sheet and take its swipes. */
+[data-phase='intro'] .skip { pointer-events: auto; }
 .go { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; pointer-events: none; font: 700 clamp(90px, 30vw, 200px)/1 var(--num); text-transform: uppercase; color: var(--gold); text-shadow: 0 6px 40px rgba(0, 0, 0, 0.5); opacity: 0; }
 .go.in { animation: go 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes go { 0% { opacity: 0; transform: scale(0.6); } 25% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(1.35); } }

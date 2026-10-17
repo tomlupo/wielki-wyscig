@@ -6,7 +6,9 @@ import { gradeAt, gradeColor } from './profile.js';
 const UP = new THREE.Vector3(0, 1, 0);
 const RIDER_SCALE = 5; // riders are drawn 5× life size so they read on a 31 m terrain grid
 const ROAD_LIFT = 1.6, ROAD_RADIUS = 2.6;
-const FOLLOW_HOME = { theta: 0, phi: 1.2, radius: 150 };
+const FOLLOW_HOME = { theta: 0, phi: 1.2, radius: 150, ahead: 45, lift: 16 };
+// Broadcast shots for the auto camera, as offsets of the follow rig: a moto beside the rider, a helicopter above.
+const SHOTS = { side: { theta: Math.PI / 2, phi: 1.36, radius: 62, ahead: 4, lift: 5 }, heli: { theta: 0.55, phi: 0.6, radius: 430, ahead: 30, lift: 0 } };
 const SUN_DIR = new THREE.Vector3(-0.74, 0.56, 0.42).normalize(); // low WSW afternoon sun
 const HAZE = new THREE.Color(0xc4d0da), ZENITH = new THREE.Color(0x2f5f9e), SUN_TINT = new THREE.Color(0xffd9a0);
 
@@ -392,8 +394,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
         r.pos.x + f.radius * Math.sin(f.phi) * Math.sin(heading),
         r.pos.y + f.radius * Math.cos(f.phi) + (pov ? 2.4 * RIDER_SCALE : 6),
         r.pos.z + f.radius * Math.sin(f.phi) * Math.cos(heading));
-      const ahead = pov ? 40 : 45;
-      wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (pov ? 0.2 * RIDER_SCALE : 16), r.pos.z + Math.cos(chaseHeading) * ahead);
+      const ahead = pov ? 40 : f.ahead;
+      wantLook.set(r.pos.x + Math.sin(chaseHeading) * ahead, r.pos.y + (pov ? 0.2 * RIDER_SCALE : f.lift), r.pos.z + Math.cos(chaseHeading) * ahead);
     } else {
       if (rig.mode === 'overview' && now - rig.lastInput > 5000) rig.orbit.theta += 0.00004 * (now - lastNow);
       orbitPosition(rig.orbit, wantPos);
@@ -507,6 +509,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   canvas.addEventListener('wheel', e => { e.preventDefault(); if (rig.intro) return skipIntro(); rig.lastInput = performance.now(); zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
 
   function rotate(dx, dy) {
+    onUserCamera?.();
     if (rig.mode === 'follow') {
       rig.follow.theta -= dx * 0.006;
       rig.follow.phi = Math.max(0.35, Math.min(1.42, rig.follow.phi - dy * 0.005));
@@ -517,11 +520,13 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     }
   }
   function zoom(f) {
+    onUserCamera?.();
     if (rig.mode === 'follow') rig.follow.radius = Math.max(25, Math.min(1500, rig.follow.radius * f));
     else if (rig.mode === 'pov') { setMode('follow'); onModeChange?.('follow'); }
     else rig.orbit.radius = Math.max(120, Math.min(14000, rig.orbit.radius * f));
   }
   function pan(dx, dy) {
+    onUserCamera?.();
     if (rig.mode === 'overview') { rig.mode = 'free'; onModeChange?.('free'); }
     const k = rig.orbit.radius * 0.0016, s = Math.sin(rig.orbit.theta), c = Math.cos(rig.orbit.theta);
     rig.orbit.target.x -= (dx * c + dy * s) * k;
@@ -529,6 +534,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     rig.orbit.target.y = elevation(rig.orbit.target.x, rig.orbit.target.z);
   }
   function doubleTap(e) {
+    onUserCamera?.();
     if (rig.mode === 'follow') { Object.assign(rig.follow, { ...FOLLOW_HOME }); return; }
     const rect = canvas.getBoundingClientRect();
     ndc.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
@@ -541,7 +547,14 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     rig.transitionUntil = performance.now() + 1200;
     onModeChange?.('free');
   }
-  let onModeChange = null;
+  let onModeChange = null, onUserCamera = null;
+
+  // A broadcast shot for the auto camera: one of the modes, or a follow-rig preset (`side` picks the left or right moto).
+  function setShot(shot, side = 1) {
+    if (!SHOTS[shot]) return setMode(shot);
+    setMode('follow');
+    Object.assign(rig.follow, { ...SHOTS[shot], theta: SHOTS[shot].theta * side });
+  }
 
   // ---- frame ----------------------------------------------------------------
   const currentD = race.riders.map(() => 0);
@@ -665,12 +678,13 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   textureReady.then(() => { lastKey = ''; });
 
   return {
-    frame, setMode, startIntro, skipIntro, addPin,
+    frame, setMode, setShot, startIntro, skipIntro, addPin,
     // Ready once imagery is decoded and shaders are compiled (in parallel where the GPU allows).
     ready: textureReady.then(() => renderer.extensions.has('KHR_parallel_shader_compile') && renderer.compileAsync(scene, camera)).catch(() => {}),
     get introRunning() { return !!rig.intro; },
     select(i) { rig.selected = i; },
     onModeChange(fn) { onModeChange = fn; },
+    onUserCamera(fn) { onUserCamera = fn; },
     setInsetRight(px) { if (px !== insetRight) { insetRight = px; resize(); } },
   };
 }

@@ -36,12 +36,22 @@ async function boot() {
   await world.detailReady; // the trees and the road-imagery index: in every frame from the first
   const glCanvas = stage.querySelector('canvas');
   const cameras = createCameras(world, model);
-  const overlay = createOverlay(ctx, { W, H, model });
+  const overlay = createOverlay(ctx, { W, H, model, beatPhase });
   const layers = [document.createElement('canvas'), document.createElement('canvas')].map(c => { c.width = W; c.height = H; return c; });
   const grain = makeGrain(256);
 
   let plan = null;
   const fromPose = new Map(); // flyto start poses, per shot
+  // Where frame f sits in the beat of the music: 0 on a beat, rising to 1 just before the next (graphics blink on it).
+  function beatPhase(f) {
+    const s = f / plan.fps, b = plan.beats ?? [];
+    if (b.length < 2) return (s * 2) % 1; // no music: a 120 BPM pulse
+    if (s < b[0]) return 0;
+    let lo = 0, hi = b.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (b[m] <= s) lo = m; else hi = m - 1; }
+    const next = b[lo + 1] ?? b[lo] + (b[lo] - b[lo - 1]);
+    return (s - b[lo]) / (next - b[lo]);
+  }
 
   // ---- clip frames: decoded images, cached, prefetched ---------------------------------------
   const cache = new Map();
@@ -98,11 +108,11 @@ async function boot() {
     }
     const g = layer.getContext('2d');
     g.drawImage(glCanvas, 0, 0, W, H);
-    if (shot.labels !== 'none') drawLabels(g, shot, c);
+    if (shot.labels !== 'none') drawLabels(g, shot, c, f);
   }
   // Rider labels over the 3D picture, as the app draws them: a helmet-colour dot (a ring where two riders share the
   // colour); the name for the focus rider.
-  function drawLabels(g, shot, c) {
+  function drawLabels(g, shot, c, f) {
     const cam = world.camera, items = [];
     model.riders.forEach((r, i) => {
       const p = world.riderPosition(i).clone();
@@ -122,7 +132,7 @@ async function boot() {
       const nameW = it.focus ? g.measureText(model.riders[it.i].name.toUpperCase()).width + 22 * S : 0;
       it.h = (it.focus ? 48 : 40) * S; it.w = it.h + nameW; it.more = 0;
       const host = placed.find(p => Math.abs(p.x - it.x) < (p.w + it.w) / 2 + 4 * S && Math.abs(p.y - it.y) < (p.h + it.h) / 2 + 2 * S);
-      if (host) { host.more++; continue; }
+      if (host) { host.more++; it.host = host; continue; }
       placed.push(it);
     }
     g.restore();
@@ -144,6 +154,34 @@ async function boot() {
       g.textBaseline = 'middle';
       if (!small) { g.fillStyle = '#f4f2ea'; g.textAlign = 'left'; g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`; g.letterSpacing = `${0.8 * S}px`; g.fillText(r.name.toUpperCase(), x + h + 2 * S, y + h / 2 + 1); }
       if (more) { g.fillStyle = '#a9b2a7'; g.textAlign = 'left'; g.font = `700 ${Math.round(24 * S)}px "Barlow Condensed"`; g.letterSpacing = '0px'; g.fillText(more, x + it.w - 4 * S, y + h / 2 + 1); }
+      g.restore();
+    }
+    drawCallouts(g, shot, f, items, S);
+  }
+  // A race move on the rider it belongs to (ATTACK, ↑ 2ND): a pill over the rider's label (or the pile that holds
+  // it) that pops in and blinks on the beat while it is fresh.
+  function drawCallouts(g, shot, f, items, S) {
+    const stacked = new Map();
+    for (const co of shot.callouts ?? []) {
+      if (f < co.from || f >= co.to) continue;
+      const it = items.find(x => x.i === co.rider);
+      if (!it) continue; // off the picture
+      const anchor = it.host ?? it, k = stacked.get(anchor) ?? 0;
+      stacked.set(anchor, k + 1);
+      const since = (f - co.from) / plan.fps, on = since >= (co.blinkFor ?? 1.6) || beatPhase(f) < 0.5;
+      const pop = 0.6 + 0.4 * easeOut(clamp01(since / 0.2));
+      g.save();
+      g.font = `700 ${Math.round(32 * S)}px "Barlow Condensed"`; g.letterSpacing = `${1.2 * S}px`;
+      const ph = 50 * S, pw = g.measureText(co.text).width + 36 * S;
+      const cy = anchor.y - anchor.h - 12 * S - 12 * S - ph / 2 - k * (ph + 8 * S);
+      g.translate(anchor.x, cy); g.scale(pop, pop);
+      g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 16 * S;
+      g.beginPath(); g.roundRect(-pw / 2, -ph / 2, pw, ph, ph / 2);
+      g.fillStyle = on ? co.color : 'rgba(12,16,14,0.92)'; g.fill();
+      g.shadowColor = 'transparent';
+      g.lineWidth = 3 * S; g.strokeStyle = co.color; g.stroke();
+      g.fillStyle = on ? '#111' : co.color; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(co.text, 0, 2 * S);
       g.restore();
     }
   }

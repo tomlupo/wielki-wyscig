@@ -82,6 +82,8 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     const shot = { id: s.id, kind: s.kind, from: x.from, to: x.to, start: x.start, end: x.end, enter: s.enter?.type ?? null, focus: s.focus ?? null, labels: s.labels ?? 'all' };
     if (s.dim) shot.dim = s.dim;
     if (s.sfx) shot.sfx = s.sfx;
+    // race moves pinned on riders in the 3D picture (ATTACK, ↑ 2ND), in frames like the cues
+    if (s.callouts) shot.callouts = s.callouts.map(c => ({ ...c, from: x.start + frameOf(c.at ?? 0), to: c.dur == null || c.dur === 'end' ? x.end : Math.min(x.end, x.start + frameOf((c.at ?? 0) + c.dur)) }));
     if (s.kind === '3d') {
       const t = mapFrames({ n, fps, ramp: s.time.speed, anchor: { value: s.time.t, at: s.time.at ?? 0 }, offset });
       shot.t = t.map(v => +Math.max(0, Math.min(model.duration, v)).toFixed(3));
@@ -159,6 +161,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     format, fps, w: W, h: H, frames, preview, scale,
     music: g.synthetic ? null : { file: beats.file, start: g.offset, tempo: beats.tempo },
     beatGrid: { synthetic: g.synthetic, cuts: bounds },
+    beats: g.beats.filter(b => b <= frames / fps + 1), // reel seconds: graphics blink on them
     facts,
     shots: out, cues, raceT, fades,
     clips: Object.values(clipsUsed),

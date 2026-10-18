@@ -30,6 +30,8 @@ const SFX = {
   impact: { d: 1.6, src: "aevalsrc='0.95*sin(2*PI*(42+70*exp(-16*t))*t)*exp(-3.8*t)+0.22*sin(2*PI*130*t)*exp(-12*t)':s=48000:d=1.6", post: 'alimiter=limit=0.9' },
   // pink noise swelling and dying away, band-limited like air past a lens
   whoosh: { d: 0.8, src: 'anoisesrc=c=pink:r=48000:a=0.9:d=0.8:s=7', post: "highpass=f=300,lowpass=f=5200,volume='pow(sin(PI*t/0.8),2.5)':eval=frame" },
+  // a race-radio alarm under an alert (ATTACK!): three quick high beeps
+  alarm: { d: 0.5, src: "aevalsrc='0.3*sgn(sin(2*PI*1320*t))*(lt(t,0.07)+between(t,0.14,0.21)+between(t,0.28,0.35))':s=48000:d=0.5", post: 'lowpass=f=4200,highpass=f=400,alimiter=limit=0.8' },
   // a two-tone horn, two short honks (the "Klakson")
   honk: { d: 0.6, src: "aevalsrc='0.22*(sgn(sin(2*PI*415*t))+sgn(sin(2*PI*523*t)))*(lt(t,0.19)+between(t,0.27,0.52))':s=48000:d=0.6", post: 'lowpass=f=2800,highpass=f=200,alimiter=limit=0.9' },
   // a two-second build: rising noise and a rising tone, cut dead at the hit
@@ -56,7 +58,10 @@ function sfxCues(plan) {
     if (s.id === 'title' || s.id === 'attack') cues.push({ name: 'riser', at: cut - 2.0, gain: 0.35 });
     for (const fx of s.sfx ?? []) cues.push({ name: fx.name, at: cut + fx.at, gain: fx.gain ?? 0.6 }); // the storyboard's own
   }
-  for (const c of plan.cues) if (c.type === 'punch') cues.push({ name: 'impact', at: c.from / plan.fps - 0.02, gain: 0.8 });
+  for (const c of plan.cues) {
+    if (c.type === 'punch') cues.push({ name: 'impact', at: c.from / plan.fps - 0.02, gain: 0.8 });
+    if (c.type === 'alert') cues.push({ name: 'impact', at: c.from / plan.fps - 0.02, gain: 0.7 }, { name: 'alarm', at: c.from / plan.fps + 0.05, gain: 0.45 });
+  }
   // one sound per moment: a punch on a flash cut keeps the bigger impact
   return cues.filter((c, k) => c.at >= 0 && !cues.some((o, j) => j !== k && o.name === c.name && Math.abs(o.at - c.at) < 0.15 && (o.gain > c.gain || (o.gain === c.gain && j < k))));
 }

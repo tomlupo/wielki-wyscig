@@ -15,7 +15,7 @@ export const easeInOut = u => u < 0.5 ? 4 * u ** 3 : 1 - (-2 * u + 2) ** 3 / 2;
 export const clamp01 = u => Math.max(0, Math.min(1, u));
 const lerp = (a, b, u) => a + (b - a) * u;
 
-export function createOverlay(ctx, { W, H, model }) {
+export function createOverlay(ctx, { W, H, model, beatPhase = f => (f / 15) % 1 }) {
   const S = Math.min(W, H) / 1080; // one design unit
   const portrait = H > W;
   // Safe area: phone apps cover the top ~11% and the bottom ~20% of a 9:16 frame, and a column on the right.
@@ -77,6 +77,8 @@ export function createOverlay(ctx, { W, H, model }) {
   // In/out envelope of a cue: 0 → 1 over `inS`, 1 → 0 over the last `outS` seconds.
   const env = (e, inS = 0.45, outS = 0.3) => ({ i: easeOut(clamp01(e.since / inS)), o: easeIn(clamp01(e.until / outS)) });
   const vis = (e, inS, outS) => { const k = env(e, inS, outS); return Math.min(k.i, k.o); };
+  // Blinking on the beat of the music while a graphic is fresh (`blinkFor` s), then held on.
+  const blinkOn = (e, c) => e.since >= (c.blinkFor ?? 1.6) || beatPhase(e.f) < 0.5;
 
   const name = i => riders[i].name.toUpperCase();
   // Every time on screen is on the official clock (race.json clockOffset: Strava's lead-in before the 3D road);
@@ -449,6 +451,53 @@ export function createOverlay(ctx, { W, H, model }) {
       ctx.translate(cx, cy); ctx.scale(s, s);
       text(c.text.toUpperCase(), 0, 0, { px: c.px ?? 190, color: c.color ?? GOLD, align: 'center', base: 'middle', spacing: 0.02, shadow: 40 });
       if (c.sub) text(c.sub.toUpperCase(), 0, (c.px ?? 190) * 0.62 * S, { w: 600, px: 40, color: INK, align: 'center', base: 'middle', spacing: 0.2, shadow: 20 });
+      ctx.restore();
+    },
+
+    // A broadcast alert for a race move (ATTACK!): a band across the frame with the word marching along it,
+    // blinking on the beat while it is fresh; the rider and the numbers underneath.
+    alert(c, e) {
+      const k = env(e, 0.12, 0.25), a = Math.min(k.i, k.o);
+      if (a <= 0) return;
+      const color = c.color ?? RED, on = blinkOn(e, c), px = c.px ?? 92;
+      const cy = (c.y ?? 0.34) * H, h = (px + 44) * S, bw = W * 1.4;
+      const word = `${c.text.toUpperCase()}   ·   `, unit = measure(word, 700, px, 0.04);
+      const shift = (e.since * (c.speed ?? 320) * S) % unit;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.translate(W / 2 - (1 - easeOut(clamp01(e.since / 0.22))) * bw, cy); // slides in from the left
+      ctx.rotate(-0.07);
+      ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 30 * S;
+      ctx.fillStyle = on ? color : 'rgba(12,16,14,0.92)';
+      ctx.fillRect(-bw / 2, -h / 2, bw, h);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = color; ctx.fillRect(-bw / 2, -h / 2, bw, 6 * S); ctx.fillRect(-bw / 2, h / 2 - 6 * S, bw, 6 * S);
+      ctx.beginPath(); ctx.rect(-bw / 2, -h / 2, bw, h); ctx.clip();
+      for (let x = -bw / 2 - unit + shift; x < bw / 2 + unit; x += unit) text(word, x, 0, { px, color: on ? '#111' : color, base: 'middle', spacing: 0.04 });
+      ctx.restore();
+      if (c.sub) { // on glass, so it reads over bright ground
+        const sub = c.sub.toUpperCase(), sw = measure(sub, 600, 40, 0.18) + 60 * S, sa = a * clamp01((e.since - 0.15) / 0.3), sy = cy + h * 0.5 + 30 * S;
+        panel(W / 2 - sw / 2, sy, sw, 66 * S, { r: 33, alpha: sa });
+        text(sub, W / 2, sy + 46 * S, { w: 600, px: 40, align: 'center', spacing: 0.18, alpha: sa });
+      }
+    },
+
+    // The lead, live: how far the rider is ahead of the next one on the road, counted on the race clock.
+    gapclock(c, e) {
+      const a = vis(e, 0.3, 0.3), t = e.t;
+      if (a <= 0 || t == null) return;
+      const lead = c.rider, order = model.orderAt(t), next = order[order.indexOf(lead) + 1];
+      if (next == null) return;
+      const value = `+${Math.max(0, model.gapBetween(lead, next, t)).toFixed(1)}`;
+      const head = `${name(lead)} LEADS BY`, foot = `AHEAD OF ${name(next)}`;
+      const x = c.x ?? L.x, y = c.y != null ? c.y * H : L.top + 170 * S, h = 196 * S;
+      const w = Math.max(measure('+88.8', 700, 96) + 120 * S, measure(head, 700, 30, 0.04) + 110 * S, measure(foot, 600, 22, 0.16) + 70 * S);
+      ctx.save(); ctx.globalAlpha = a;
+      panel(x, y, w, h, { accent: riders[lead].color });
+      dot(x + 46 * S, y + 46 * S, 18 * S, riders[lead]);
+      text(head, x + 76 * S, y + 57 * S, { px: 30, spacing: 0.04 });
+      num(value, x + 32 * S, y + 146 * S, { px: 96, color: GOLD });
+      text('S', x + 32 * S + measure(value.replace(/\d/g, '0'), 700, 96) + 10 * S, y + 146 * S, { px: 40, color: GOLD }); // num() sets digits on a grid of 0s
+      text(foot, x + 34 * S, y + h - 18 * S, { w: 600, px: 22, color: DIM, spacing: 0.16 });
       ctx.restore();
     },
 

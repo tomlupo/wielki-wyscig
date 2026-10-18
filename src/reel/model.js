@@ -48,6 +48,8 @@ export function buildModel(race, route) {
     const d = distance(i, t);
     return Math.max(0, timeAtDistance(riders[i].samples, d) - timeAtDistance(riders[lead].samples, d));
   }
+  // How long ago rider a was where rider b is now (a's lead over b at the same road point; negative if b is ahead).
+  const gapBetween = (a, b, t) => t - timeAtDistance(riders[a].samples, distance(b, t));
   // Does `rider` hold `rank` (0-based) for the whole race-time window [t0, t1]? Captions use this.
   function holdsRank(rider, rank, t0, t1) {
     for (let t = t0; t <= t1; t += 0.5) if (orderAt(t)[rank] !== rider) return false;
@@ -57,7 +59,7 @@ export function buildModel(race, route) {
   const clockOffset = race.clockOffset ?? 0;
   const shown = t => t + clockOffset;
   const estimated = i => race.riders[i].officialTime == null && race.riders.some(r => r.officialTime != null);
-  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, holdsRank, clockOffset, shown, estimated };
+  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, gapBetween, holdsRank, clockOffset, shown, estimated };
 }
 
 export const ORDINAL = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th');

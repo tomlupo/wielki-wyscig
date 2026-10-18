@@ -57,7 +57,10 @@ step('Sync the clips to the race clock');
 sh('uv', ['run', '--quiet', 'scripts/reel/sync.py']);
 
 step('Music');
-const tracks = existsSync(MUSIC) ? readdirSync(MUSIC).filter(f => /\.(mp3|wav|flac|m4a|ogg)$/i.test(f)) : [];
+// The track: --music <file in data/music>, else the newest one there (drop a new song in and it takes over).
+const tracks = existsSync(MUSIC) ? readdirSync(MUSIC).filter(f => /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(f))
+  .sort((a, b) => statSync(`${MUSIC}/${b}`).mtimeMs - statSync(`${MUSIC}/${a}`).mtimeMs) : [];
+if (opt('music')) tracks.unshift(opt('music'));
 if (tracks.length) {
   const beats = `${WORK}/beats.json`;
   if (!existsSync(beats) || statSync(beats).mtimeMs < statSync(`${MUSIC}/${tracks[0]}`).mtimeMs || flag('rebeat')) sh('uv', ['run', '--quiet', 'scripts/reel/beats.py', `${MUSIC}/${tracks[0]}`, '--out', beats]);

@@ -56,7 +56,10 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
 
   // ===== ACT 0 · COLD OPEN: the best real moments, slowed down ==================================
   seg({ id: 'open-wall', kind: 'clip', file: 'IMG_7782.MOV', dur: 2.8, src: { s: 2.2, speed: 0.5 }, enter: { type: 'fade', frames: 18 }, zoom: [1.06, 1.0], audio: 0.5,
-    cues: [{ type: 'title', at: 0.5, dur: 2.4, y: 0.16, lines: [{ text: 'MALLORCA · 17.10.2026', px: 30, w: 600, color: '#ffd34d', spacing: 0.24 }] }] });
+    cues: [{ type: 'title', at: 0.4, dur: 'end', y: portrait ? 0.2 : 0.2, lines: [
+      { text: 'MALLORCA · 17.10.2026', px: 32, w: 600, color: '#ffd34d', spacing: 0.24, gap: 12 },
+      { text: `${WORDS[riders.length] ?? riders.length} RIDERS. ONE CLIMB.`, px: portrait ? 62 : 70, w: 700, spacing: 0.02 },
+    ] }] });
   seg({ id: 'open-wheel', kind: 'clip', file: 'IMG_7786.MOV', dur: 1.7, src: { s: 0.4, speed: 0.8 }, zoom: [1.0, 1.08] });
   seg({ id: 'open-hairpin', kind: 'clip', file: 'IMG_7794.MOV', dur: 1.9, src: { s: 9.5, speed: 1 } });
 
@@ -89,7 +92,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   seg({ id: 'start-3d', kind: '3d', dur: 2.4, enter: { type: 'wipe', frames: 14 }, focus: firstLead.rider, labels: 'all',
     time: { t: 2, speed: 5 }, cam: { type: 'chase', rider: firstLead.rider, group: true, dist: 95, phi: 1.3, ahead: 35, fov: 38, swing: 'auto', push: -0.04 },
     cues: [{ type: 'punch', at: 0.35, dur: 1.4, text: 'GO', px: 220 }] });
-  seg({ id: 'first-lead', kind: '3d', dur: 2.8, focus: firstLead.rider, labels: 'names',
+  seg({ id: 'first-lead', kind: '3d', dur: 2.8, focus: firstLead.rider, labels: 'all',
     time: { t: firstLead.t, at: 1.4, speed: [[0, 6], [1.0, 3], [2.0, 3], [3.2, 6]] }, cam: { type: 'side', rider: firstLead.rider, group: true, reach: 60, dist: 130, fov: 24, sign: 'auto', push: -0.04 },
     cues: [{ type: 'event', at: 0.9, dur: 2.1, kicker: `KM ${km(model.distance(firstLead.rider, firstLead.t))} · ${clock(firstLead.t)}`, head: `${name(firstLead.rider)} goes`, sub: `takes the lead from ${name(firstLead.other)}`, rider: firstLead.rider }] });
 
@@ -137,7 +140,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   const c86 = clipInfo('IMG_7786.MOV'), c87 = clipInfo('IMG_7787.MOV');
   seg({ id: 'wheel', kind: 'clip', file: 'IMG_7786.MOV', dur: 2.0, src: { s: 0.6, speed: 1 }, enter: { type: 'zoom', frames: 8 }, twin: { type: 'chase', rider: chaser, dist: 70, phi: 1.3, ahead: 40, fov: 38 },
     cues: [stamp('IMG_7786.MOV')] });
-  seg({ id: 'pass-profile', kind: 'clip', file: 'IMG_7787.MOV', dur: 3.6, src: { s: 16.7, at: 2.2, speed: [[0, 1], [1.6, 1], [2.0, 0.45], [3.6, 0.45]] }, twin: twin('IMG_7787.MOV'), audio: 0.5,
+  seg({ id: 'pass-profile', kind: 'clip', file: 'IMG_7787.MOV', dur: 3.6, src: { s: 16.7, at: 2.2, speed: [[0, 1], [1.6, 1], [2.0, 0.45], [3.6, 0.45]] }, twin: twin('IMG_7787.MOV'), audio: 0.2,
     cues: [stamp('IMG_7787.MOV')] });
   seg({ id: 'gap-heli', kind: '3d', dur: 2.4, focus: attacker, labels: 'all',
     time: { t: c87.raceT0 + 60, speed: [[0, 40], [2.8, 40]] }, cam: { type: 'heli', rider: attacker, group: true, reach: 400, radius: 900, phi: 0.55, spin: 0.04, theta: -0.4, fov: 34 },
@@ -157,7 +160,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
       cues: [stamp(file, { place: 'THE COL' }), { type: 'finisher', rider, at: Math.max(0.1, (sight?.at ?? s0) - s0 - 1.0), dur: 'end' }] });
   };
   arrive('col-3', 'IMG_7792.MOV', 1.4, 2.4, third, { enter: { type: 'flash', frames: 6 } });
-  arrive('col-4', 'IMG_7793.MOV', 15.4, 2.4, R('krzys'));
+  arrive('col-4', 'IMG_7793.MOV', 15.4, 2.4, R('krzys'), { audio: 0.7 });
   arrive('col-5', 'IMG_7794.MOV', 8.9, 2.5, R('el-lobo'));
   const c95 = clipInfo('IMG_7795.MOV');
   const lastTwo = (c95.sightings ?? []).map(s => R(s.rider));
@@ -176,7 +179,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   seg({ id: 'gaps', kind: '3d', dur: 4.0, focus: winner, labels: 'none', dim: 0.62,
     time: { t: duration, speed: 0 }, cam: { type: 'overview', d: len * 0.5, radius: 7000, phi: 0.95, theta: 0.4, spin: 0.025, fov: 40 },
     cues: [{ type: 'gaps', at: 0.15, dur: 'end' }] });
-  seg({ id: 'selfie', kind: 'clip', file: 'VMGY3907.MP4', dur: 1.8, src: { s: 0.6, speed: 1 }, enter: { type: 'flash', frames: 6 }, twin: null, fit: portrait ? 'cover' : 'blur' });
+  seg({ id: 'selfie', kind: 'clip', file: 'VMGY3907.MP4', dur: 1.8, src: { s: 0.6, speed: 1 }, enter: { type: 'flash', frames: 6 }, twin: null, fit: portrait ? 'cover' : 'blur', audio: 0.6 });
   seg({ id: 'end', kind: '3d', dur: 3.4, enter: { type: 'fade', frames: 12 }, labels: 'none', focus: null, dim: 0.72,
     time: { t: duration, speed: 0 }, cam: { type: 'overview', d: len * 0.5, radius: 7600, phi: 0.92, theta: 0.55, spin: 0.03, fov: 40 },
     cues: [{ type: 'end', at: 0.1, dur: 'end', credits: [
@@ -192,6 +195,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   return { segments: S, spans, facts: { attacker, attacked, chaser, winner, tAttack, tWin, best30, chaserHr } };
 }
 
+const WORDS = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE'];
 export function ordinal(n) { return n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th'); }
 function localTime(epoch, offset) {
   const sign = offset?.[0] === '-' ? -1 : 1, mins = offset ? sign * (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(3, 5))) : 0;

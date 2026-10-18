@@ -104,13 +104,26 @@ async function boot() {
       items.push({ i, x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H, focus: i === shot.focus || (shot.labels === 'names') });
     });
     const S = overlay.S;
-    items.sort((a, b) => a.focus - b.focus);
+    // A bunch would stack its labels into an unreadable pile: the first label of a pile stands for it with "+N"
+    // (the focus rider claims a place first, then riders by race position).
+    const order = model.orderAt(c.t);
+    items.sort((a, b) => b.focus - a.focus || order.indexOf(a.i) - order.indexOf(b.i));
+    const placed = [];
+    g.save(); g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`;
     for (const it of items) {
+      const nameW = it.focus ? g.measureText(model.riders[it.i].name.toUpperCase()).width + 22 * S : 0;
+      it.h = (it.focus ? 48 : 40) * S; it.w = it.h + nameW; it.more = 0;
+      const host = placed.find(p => Math.abs(p.x - it.x) < (p.w + it.w) / 2 + 4 * S && Math.abs(p.y - it.y) < (p.h + it.h) / 2 + 2 * S);
+      if (host) { host.more++; continue; }
+      placed.push(it);
+    }
+    g.restore();
+    for (const it of placed.reverse()) {
       const r = model.riders[it.i], small = !it.focus;
       g.save();
       g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`;
-      const nameW = small ? 0 : g.measureText(r.name.toUpperCase()).width + 22 * S;
-      const h = (small ? 40 : 48) * S, w = h + nameW, x = it.x - w / 2, y = it.y - h - 12 * S;
+      const more = it.more ? `+${it.more}` : '', moreW = more ? g.measureText(more).width + 14 * S : 0;
+      const h = it.h, w = it.w + moreW, x = it.x - w / 2, y = it.y - h - 12 * S;
       g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 14 * S;
       g.beginPath(); g.roundRect(x, y, w, h, h / 2); g.fillStyle = 'rgba(12,16,14,0.88)'; g.fill();
       g.shadowColor = 'transparent';
@@ -120,6 +133,7 @@ async function boot() {
       g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${Math.round((small ? 22 : 26) * S)}px "Barlow Condensed"`;
       g.fillText(r.letter, x + h / 2, y + h / 2 + 1);
       if (!small) { g.fillStyle = '#f4f2ea'; g.textAlign = 'left'; g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`; g.letterSpacing = `${0.8 * S}px`; g.fillText(r.name.toUpperCase(), x + h + 2 * S, y + h / 2 + 1); }
+      if (more) { g.fillStyle = '#a9b2a7'; g.textAlign = 'left'; g.font = `700 ${Math.round(24 * S)}px "Barlow Condensed"`; g.letterSpacing = '0px'; g.fillText(more, x + it.w - 4 * S, y + h / 2 + 1); }
       g.restore();
     }
   }
@@ -219,7 +233,7 @@ async function boot() {
     const v = ctx.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.5, Math.hypot(W, H) * 0.62);
     v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.38)');
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
-    ctx.save(); ctx.globalAlpha = 0.05; ctx.globalCompositeOperation = 'overlay';
+    ctx.save(); ctx.globalAlpha = 0.035; ctx.globalCompositeOperation = 'overlay';
     const ox = (f * 73) % 256, oy = (f * 151) % 256;
     ctx.fillStyle = ctx.createPattern(grain, 'repeat'); ctx.translate(-ox, -oy); ctx.fillRect(ox, oy, W, H);
     ctx.restore();

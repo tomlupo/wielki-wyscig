@@ -32,8 +32,9 @@ function encode(framesDir, audio, out, { fps, preview }) {
   return new Promise((resolve, reject) => {
     const a = ['-hide_banner', '-loglevel', 'error', '-y', '-framerate', String(fps), '-i', `${framesDir}/%06d.jpg`, '-i', audio,
       '-vf', 'scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p',
-      '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '22' : '15', '-profile:v', 'high', '-tune', 'film',
-      ...(preview ? [] : ['-maxrate', '40M', '-bufsize', '80M']),
+      // a high-bitrate master (~20 Mbit/s, capped at 24): the platforms re-encode it, so give them a clean source
+      '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '22' : '16', '-profile:v', 'high', '-tune', 'grain',
+      ...(preview ? [] : ['-maxrate', '24M', '-bufsize', '48M']),
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
       '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-shortest', '-movflags', '+faststart', out];
     const p = spawn('ffmpeg', a, { stdio: ['ignore', 'ignore', 'pipe'] });

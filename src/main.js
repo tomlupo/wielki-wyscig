@@ -634,7 +634,11 @@ async function boot() {
   });
 
   // ---- go ------------------------------------------------------------------------------------
-  for (const m of moments) world?.addPin({ d: m.d, label: `Video: ${m.caption}`, onClick: () => live && openMoment(m) });
+  // Clips filmed at the same spot (the summit has three) fan out side by side, each pin tappable.
+  moments.forEach((m, k) => {
+    const stack = moments.slice(0, k).filter(o => Math.abs(o.d - m.d) < 40).length;
+    world?.addPin({ d: m.d, label: `Video: ${m.caption}`, stack, onClick: () => live && openMoment(m) });
+  });
   live = true;
   select(selected);
   syncCams();

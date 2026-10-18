@@ -79,7 +79,7 @@ Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not stre
 
 ## Real rides: `scripts/fit_to_race.py`
 
-`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). Raw ride files stay in `rides/`, which is ignored by version control: they are whole rides with personal data (home location, weight, heart-rate zones), and only the trimmed climb is published.
+`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). The raw rides are kept in the repository under `rides/` (one FIT file per rider, ~5 MB for 17.10), so `data/race.json` can be rebuilt and re-checked at any time. They are whole rides with personal data (home location, weight, heart-rate zones): the site never serves them (they are outside `public/`), and only the trimmed climb in `data/race.json` is published.
 
 17.10 was built with:
 

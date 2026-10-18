@@ -3,4 +3,3 @@ dist/
 .vercel/
 .env*
 !.env.example
-rides/

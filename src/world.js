@@ -56,7 +56,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   scene.add(ground);
   // The tile index and the trees arrive after the first picture: the race never waits for them.
   let trees = null, sceneDirty = false;
-  fetch('/corridor/index.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(async index => {
+  const detailReady = fetch('/corridor/index.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(async index => {
     corridor.setIndex(index, width, depth);
     const built = await buildTrees({ index, terrain, elevation, lite, phone: coarse });
     scene.add(built.group);
@@ -809,5 +809,6 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     // Offline rendering (src/reel): fn(now) → { pos, look, fov } each frame (null: back to the rig), and the scene to aim it.
     setDirectCamera(fn) { directCamera = fn; }, holdQuality() { holdQuality = true; },
     camera, roadPoint, roadDir, elevation, riderPosition: i => riders[i].pos,
+    detailReady, tilesPending: () => corridor.pending(), // the trees and the road imagery, which load after the first picture
   };
 }

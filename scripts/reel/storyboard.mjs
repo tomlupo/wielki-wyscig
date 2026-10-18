@@ -206,7 +206,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   seg({ id: 'end', kind: 'clip', file: 'IMG_7795.MOV', fit: 'bg', dim: 0.66, dur: 3.2, src: { s: 3.6, speed: 0.4 }, enter: { type: 'fade', frames: 12 },
     cues: [{ type: 'end', at: 0.1, dur: 'end', credits: [
       ...(credits.music ? [credits.music] : []),
-      'Aerial imagery © IGN / PNOA, CC BY 4.0 · Elevation: Mapzen / AWS Terrain Tiles',
+      'Aerial imagery and 5 m LiDAR elevation © IGN (PNOA, MDT05), CC BY 4.0',
       'Road © OpenStreetMap contributors (ODbL) · Ride data: the riders\' own FIT files',
     ] }] });
 

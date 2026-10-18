@@ -78,6 +78,8 @@ export function createCorridor({ renderer, hi }) {
       assign();
       return changed();
     },
+    // Offline rendering (src/reel): a tile is still on its way, so a frame can wait until the ground is sharp.
+    pending() { return tiles.some(t => t.loading); },
   };
 }
 

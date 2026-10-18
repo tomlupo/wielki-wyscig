@@ -9,7 +9,8 @@ import { deriveEvents } from '../events.js';
 export { interpolate, timeAtDistance, telemetryAt, formatClock, formatGap, gradeAt };
 
 export function buildModel(race, route) {
-  const riders = race.riders.map((r, i) => ({ ...r, index: i, letter: String.fromCharCode(65 + i), finish: r.samples.at(-1).t }));
+  // Riders are told apart by helmet colour, as in the app: where two share one, the later rider is drawn as a ring.
+  const riders = race.riders.map((r, i) => ({ ...r, index: i, ring: race.riders.slice(0, i).some(o => o.color.toLowerCase() === r.color.toLowerCase()), finish: r.samples.at(-1).t }));
   const duration = Math.max(...riders.map(r => r.finish));
   const len = route.at(-1)[3];
   const summit = route.reduce((best, p) => p[2] > best[2] ? p : best);

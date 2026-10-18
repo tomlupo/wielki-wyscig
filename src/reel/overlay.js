@@ -65,11 +65,13 @@ export function createOverlay(ctx, { W, H, model }) {
     if (accent) { ctx.save(); ctx.clip(); ctx.fillStyle = accent; ctx.fillRect(x, y, 5 * S, h); ctx.restore(); }
     ctx.restore();
   }
-  function dot(cx, cy, r, color, letter, { ring = 0, alpha = 1 } = {}) {
+  // A rider as the app shows one: a disc in their helmet colour, or a ring for a later rider who shares the colour.
+  function dot(cx, cy, r, rider, { halo = 0, alpha = 1 } = {}) {
     ctx.save(); ctx.globalAlpha *= alpha;
-    if (ring) { ctx.beginPath(); ctx.arc(cx, cy, r + ring * S, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill(); }
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
-    if (letter) { ctx.font = `700 ${Math.round(r * 1.25)}px ${FONT}`; ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(letter, cx, cy + r * 0.08); }
+    if (halo) { ctx.beginPath(); ctx.arc(cx, cy, r + (2 + halo / 2) * S, 0, Math.PI * 2); ctx.lineWidth = halo * S; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke(); }
+    ctx.beginPath();
+    if (rider.ring) { ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2); ctx.lineWidth = r * 0.44; ctx.strokeStyle = rider.color; ctx.stroke(); }
+    else { ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = rider.color; ctx.fill(); }
     ctx.restore();
   }
   // In/out envelope of a cue: 0 → 1 over `inS`, 1 → 0 over the last `outS` seconds.
@@ -128,7 +130,7 @@ export function createOverlay(ctx, { W, H, model }) {
       const y = y0 + (1 - env(e).i) * 30 * S;
       ctx.save(); ctx.globalAlpha = a;
       panel(x, y, w, h, { accent: r.color });
-      dot(x + 52 * S, y + 52 * S, 26 * S, r.color, r.letter);
+      dot(x + 52 * S, y + 52 * S, 26 * S, r);
       text(name(i), x + 94 * S, y + 52 * S, { px: 40, spacing: 0.03 });
       const place = fin ? `FINISHED ${ORDINAL(rank).toUpperCase()} · ${finishText(i)}` : rank === 1 ? 'P1 · LEADING' : `P${rank} · ${gapTexts(t)[i]}`;
       text(place, x + 94 * S, y + 84 * S, { w: 500, px: 28, color: DIM, spacing: 0.04 });
@@ -179,7 +181,7 @@ export function createOverlay(ctx, { W, H, model }) {
         const rx = x + slide + (up ? pass * 26 * S : 0), ra = clamp01((e.since - 0.06 * k) / 0.35) * (up ? 1 : 1 - 0.45 * pass);
         ctx.globalAlpha = a * ra;
         num(String(order.indexOf(i) + 1), rx + 34 * S, ry + rowH * 0.66, { px: 28, color: order[0] === i ? GOLD : DIM, align: 'right' });
-        dot(rx + 66 * S, ry + rowH * 0.5, 15 * S, r.color, r.letter);
+        dot(rx + 66 * S, ry + rowH * 0.5, 15 * S, r);
         text(name(i), rx + 92 * S, ry + rowH * 0.66, { w: 600, px: 27, spacing: 0.03 });
         const g = gaps[i];
         text(g, x + w - 22 * S, ry + rowH * 0.66, { w: 600, px: 26, color: g === 'LEADER' ? GOLD : DIM, align: 'right' });
@@ -225,7 +227,7 @@ export function createOverlay(ctx, { W, H, model }) {
       }
       for (const i of order) {
         const d = model.distance(i, t), focus = i === c.focus;
-        dot(X(d), E(eleAt(d)) - 2 * S, (focus ? 17 : 13) * S, riders[i].color, riders[i].letter, { ring: focus ? 3 : 0 });
+        dot(X(d), E(eleAt(d)) - 2 * S, (focus ? 17 : 13) * S, riders[i], { halo: focus ? 3 : 0 });
       }
       ctx.restore();
     },
@@ -263,7 +265,7 @@ export function createOverlay(ctx, { W, H, model }) {
       const bx = c.align === 'right' ? -w : c.align === 'center' ? -w / 2 : 0, by = -h - 18 * S;
       panel(bx, by, w, h, { r: 31, fill: 'rgba(12,16,14,0.88)' });
       ctx.lineWidth = 3 * S; ctx.strokeStyle = r.color; ctx.beginPath(); ctx.roundRect(bx, by, w, h, 31 * S); ctx.stroke();
-      dot(bx + 34 * S, by + h / 2, 22 * S, r.color, r.letter);
+      dot(bx + 34 * S, by + h / 2, 22 * S, r);
       text(label, bx + 66 * S, by + h / 2 + 12 * S, { px: 34, spacing: 0.03 });
       if (extra) text(extra, bx + 66 * S + lw + 22 * S, by + h / 2 + 11 * S, { w: 600, px: 28, color: c.extraColor ?? GOLD });
       // pointer
@@ -287,7 +289,7 @@ export function createOverlay(ctx, { W, H, model }) {
       const x = c.x ?? L.x, y = (c.y != null ? c.y * H : (portrait ? L.bottom - h - 300 * S : L.bottom - h - 220 * S)) + (1 - k.i) * 30 * S;
       ctx.save(); ctx.globalAlpha = a;
       panel(x, y, w, h, { accent: r?.color ?? color });
-      if (r) dot(x + 50 * S, y + 50 * S, 20 * S, r.color, r.letter);
+      if (r) dot(x + 50 * S, y + 50 * S, 20 * S, r);
       text(head, x + (r ? 82 : 34) * S, y + 62 * S, { px: 34, spacing: 0.04 });
       const vy = y + 62 * S + big * 0.92 * S;
       num(value, x + 32 * S, vy, { px: big, color });
@@ -310,7 +312,7 @@ export function createOverlay(ctx, { W, H, model }) {
         const r = riders[i], ry = y + 74 * S + n * rowH, u = easeOut(clamp01((e.since - 0.12 * n) / 0.7));
         const v = interpolate(r.samples, t, key);
         if (n) { ctx.fillStyle = LINE; ctx.fillRect(x + 30 * S, ry, w - 60 * S, 1.5 * S); }
-        dot(x + 54 * S, ry + rowH / 2, 22 * S, r.color, r.letter);
+        dot(x + 54 * S, ry + rowH / 2, 22 * S, r);
         text(r.name.toUpperCase(), x + 90 * S, ry + rowH / 2 + 13 * S, { px: 38, spacing: 0.03 });
         const uw = measure(unit, 700, 30);
         text(unit, x + w - 30 * S, ry + rowH / 2 + 22 * S, { px: 30, color: c.colors?.[n] ?? DIM, align: 'right' });
@@ -336,7 +338,7 @@ export function createOverlay(ctx, { W, H, model }) {
       const now = Math.max(t0, Math.min(t1, t)), color = c.color ?? r.color;
       ctx.save(); ctx.globalAlpha = a;
       panel(x, y, w, h, { accent: r.color });
-      dot(x + 46 * S, y + 46 * S, 18 * S, r.color, r.letter);
+      dot(x + 46 * S, y + 46 * S, 18 * S, r);
       text(r.name.toUpperCase(), x + 76 * S, y + 56 * S, { px: 30, spacing: 0.04 });
       text((c.label ?? (key === 'hr' ? 'HEART RATE' : 'POWER')).toUpperCase(), x + 76 * S, y + 82 * S, { w: 600, px: 19, color: DIM, spacing: 0.16 });
       const cur = interpolate(r.samples, now, key);
@@ -476,11 +478,12 @@ export function createOverlay(ctx, { W, H, model }) {
       const order = model.byFinish.slice().reverse();
       for (const i of order) {
         ctx.strokeStyle = riders[i].color; ctx.lineWidth = (i === model.winner ? 6 : 4.5) * S; ctx.lineJoin = 'round';
+        ctx.setLineDash(riders[i].ring ? [14 * S, 9 * S] : []); // same helmet colour as another rider: dashed, as on the app's card
         ctx.beginPath();
         for (let k = 0; k <= upto; k++) { const px = X(ds[k]), py = Y(lines[i][k]); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-        ctx.stroke();
+        ctx.stroke(); ctx.setLineDash([]);
         const ex = X(ds[upto]), ey = Y(lines[i][upto]);
-        dot(ex, ey, 12 * S, riders[i].color, riders[i].letter);
+        dot(ex, ey, 12 * S, riders[i]);
       }
       // labels at the right edge once drawn
       if (draw > 0.97) {
@@ -529,7 +532,7 @@ export function createOverlay(ctx, { W, H, model }) {
         ctx.save(); ctx.globalAlpha = a * u; ctx.translate((1 - u) * 50 * S, 0);
         ctx.fillStyle = LINE; ctx.fillRect(x, ry + rh - 1.5 * S, w, 1.5 * S);
         num(String(k + 4), x + 30 * S, ry + rh * 0.68, { px: 34, color: DIM, align: 'right' });
-        dot(x + 72 * S, ry + rh / 2, 20 * S, r.color, r.letter);
+        dot(x + 72 * S, ry + rh / 2, 20 * S, r);
         text(r.name.toUpperCase(), x + 108 * S, ry + rh * 0.68, { w: 600, px: 34 });
         num(finishText(i), x + w - 170 * S, ry + rh * 0.68, { w: 600, px: 32, align: 'right' });
         text(formatGap(r.finish - riders[model.winner].finish), x + w, ry + rh * 0.68, { w: 600, px: 32, color: DIM, align: 'right' });

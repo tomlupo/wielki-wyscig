@@ -33,6 +33,7 @@ async function boot() {
   const world = await createWorld({ container: stage, labels: $('labels'), terrain, race: { ...race, riders: model.riders }, onSelect() {}, onPageDrag() { return false; } });
   world.holdQuality();
   await world.ready;
+  await world.detailReady; // the trees and the road-imagery index: in every frame from the first
   const glCanvas = stage.querySelector('canvas');
   const cameras = createCameras(world, model);
   const overlay = createOverlay(ctx, { W, H, model });
@@ -79,21 +80,28 @@ async function boot() {
     return cameras.pose(spec, camCtx(shot, f));
   }
   let lastInset = 0;
-  function render3d(shot, f, layer) {
+  async function render3d(shot, f, layer) {
     const c = camCtx(shot, f), pose = poseOf(shot, f);
     const inset = shot.inset ?? 0;
     if (inset !== lastInset) { world.setInsetRight(inset); lastInset = inset; }
     world.setDirectCamera(() => pose);
+    if (shot.focus != null) world.select(shot.focus); // the road imagery and detail load around the shot's rider
     const next = shot.t[Math.min(shot.t.length - 1, f - shot.from + 1)];
     const rate = Math.max(0, (next - c.t) * plan.fps);
     const args = { time: c.t, distances: c.d, playing: true, rate };
     if (f === shot.from) world.frame(args); // settle level-of-detail and trails after a cut
     world.frame(args);
+    // A road tile still loading: wait for it and draw the frame again, so every frame shows the sharp ground.
+    if (world.tilesPending()) {
+      for (let k = 0; k < 400 && world.tilesPending(); k++) await new Promise(r => setTimeout(r, 15));
+      world.frame(args);
+    }
     const g = layer.getContext('2d');
     g.drawImage(glCanvas, 0, 0, W, H);
     if (shot.labels !== 'none') drawLabels(g, shot, c);
   }
-  // Rider labels over the 3D picture, as the app draws them: a dot with the letter; the name for the focus rider.
+  // Rider labels over the 3D picture, as the app draws them: a helmet-colour dot (a ring where two riders share the
+  // colour); the name for the focus rider.
   function drawLabels(g, shot, c) {
     const cam = world.camera, items = [];
     model.riders.forEach((r, i) => {
@@ -129,9 +137,11 @@ async function boot() {
       g.shadowColor = 'transparent';
       g.lineWidth = (small ? 2 : 3) * S; g.strokeStyle = r.color; g.stroke();
       g.beginPath(); g.moveTo(it.x - 7 * S, y + h); g.lineTo(it.x + 7 * S, y + h); g.lineTo(it.x, y + h + 10 * S); g.closePath(); g.fillStyle = r.color; g.fill();
-      g.beginPath(); g.arc(x + h / 2, y + h / 2, h / 2 - 6 * S, 0, Math.PI * 2); g.fillStyle = r.color; g.fill();
-      g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${Math.round((small ? 22 : 26) * S)}px "Barlow Condensed"`;
-      g.fillText(r.letter, x + h / 2, y + h / 2 + 1);
+      const cr = h / 2 - 6 * S;
+      g.beginPath();
+      if (r.ring) { g.arc(x + h / 2, y + h / 2, cr * 0.78, 0, Math.PI * 2); g.lineWidth = cr * 0.44; g.strokeStyle = r.color; g.stroke(); }
+      else { g.arc(x + h / 2, y + h / 2, cr, 0, Math.PI * 2); g.fillStyle = r.color; g.fill(); }
+      g.textBaseline = 'middle';
       if (!small) { g.fillStyle = '#f4f2ea'; g.textAlign = 'left'; g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`; g.letterSpacing = `${0.8 * S}px`; g.fillText(r.name.toUpperCase(), x + h + 2 * S, y + h / 2 + 1); }
       if (more) { g.fillStyle = '#a9b2a7'; g.textAlign = 'left'; g.font = `700 ${Math.round(24 * S)}px "Barlow Condensed"`; g.letterSpacing = '0px'; g.fillText(more, x + it.w - 4 * S, y + h / 2 + 1); }
       g.restore();
@@ -147,7 +157,7 @@ async function boot() {
     const k = f - shot.from, u = shot.to - shot.from > 1 ? k / (shot.to - shot.from - 1) : 0;
     const zoom = shot.zoom ? shot.zoom[0] + (shot.zoom[1] - shot.zoom[0]) * easeInOut(u) : 1;
     if (shot.fit === 'panel') {
-      if (shot.cam) render3d(shot, f, layer); else { g.fillStyle = '#0b0f0d'; g.fillRect(0, 0, W, H); }
+      if (shot.cam) await render3d(shot, f, layer); else { g.fillStyle = '#0b0f0d'; g.fillRect(0, 0, W, H); }
       const ph = H - 2 * shot.panel.margin, pw = ph * ia.width / ia.height, px = W - shot.panel.margin - pw, py = shot.panel.margin;
       g.save();
       g.shadowColor = 'rgba(0,0,0,0.55)'; g.shadowBlur = 40; g.shadowOffsetX = -8;
@@ -200,7 +210,7 @@ async function boot() {
   async function renderShot(shot, f, layer) {
     const g = layer.getContext('2d');
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.filter = 'none';
-    if (shot.kind === '3d') render3d(shot, f, layer);
+    if (shot.kind === '3d') await render3d(shot, f, layer);
     else if (shot.kind === 'clip') await renderClip(shot, f, layer);
     else { g.fillStyle = shot.color ?? '#0b0f0d'; g.fillRect(0, 0, W, H); }
     if (shot.dim) { g.fillStyle = `rgba(6,9,8,${shot.dim})`; g.fillRect(0, 0, W, H); } // under a full-screen graphic

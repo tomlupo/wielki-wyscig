@@ -16,7 +16,7 @@ Vite + three.js 0.160 + d3, plain ES modules; Python build scripts run with `uv 
 | Ground | `public/terrain.json` + `public/corridor/`, built by `scripts/build_terrain.py` |
 | Clips | `data/media.json` + `public/media/*.mp4/.jpg`; raw phone videos in `data/videos/` (git-ignored) |
 | App | `src/main.js` (HUD, sheet, clips), `src/world.js` (scene, cameras), `src/terrain.js`, `src/corridor.js`, `src/trees.js`, `src/roadside.js`, `src/atmosphere.js`, `src/director.js` (TV camera), `src/events.js`, `src/card.js` |
-| Reels | `scripts/reel/` + `src/reel/` (`npm run reel`) |
+| Reels | `scripts/reel/` + `src/reel/` (`npm run reel`): still on branch `worktree-highlight-reel`, not yet merged |
 
 ## Rules that bite
 

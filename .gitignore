@@ -3,8 +3,8 @@ dist/
 .vercel/
 .env*
 !.env.example
-rides/
-# Highlight reel: phone footage and renders stay local (scripts/reel)
 data/videos/
+.cache/
+# Highlight reel: the music and the renders stay local (scripts/reel)
 data/music/
 out/

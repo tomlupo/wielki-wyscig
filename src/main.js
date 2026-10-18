@@ -46,10 +46,12 @@ async function boot() {
     loadRace(),
   ]);
   setProgress(0.9);
+  $('load-msg').textContent = 'Building the 3D climb…'; // the slow part on a phone: meshes and shaders, with no bytes to count
   if (Math.abs(race.distanceM - terrain.route.at(-1)[3]) > 1) throw new Error('Race distance does not match this climb.');
 
   // ---- race model ---------------------------------------------------------
-  const riders = race.riders.map((r, i) => ({ ...r, index: i, letter: String.fromCharCode(65 + i), finish: r.samples.at(-1).t }));
+  // Riders are told apart by helmet colour; where two share one, the later rider is drawn as a ring.
+  const riders = race.riders.map((r, i) => ({ ...r, index: i, ring: race.riders.slice(0, i).some(o => o.color.toLowerCase() === r.color.toLowerCase()), finish: r.samples.at(-1).t }));
   const duration = Math.max(...riders.map(r => r.finish));
   // The official clock starts before the 3D road (DATA.md, clockOffset): every time shown is on it.
   const clockOffset = race.clockOffset ?? 0, shown = t => formatClock(t + clockOffset + 1e-6);
@@ -90,7 +92,7 @@ async function boot() {
   const board = $('board');
   const rows = riders.map((r, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
+    li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter${r.ring ? ' ring' : ''}"></b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
     li.querySelector('.nm').textContent = r.name;
     li.querySelector('button').addEventListener('click', () => followRider(i));
     board.append(li);
@@ -208,7 +210,7 @@ async function boot() {
   let world = null, live = false, pageDrag = null;
   try {
     const { createWorld } = await worldModule;
-    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y) });
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y), keepOut: document.querySelector('.top') });
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
     world.onUserCamera(() => live && autoOff());
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
@@ -257,7 +259,7 @@ async function boot() {
     auto = on;
     world.setCinematic(on);
     app.classList.toggle('auto', on); // letterbox bars while the director has the camera
-    if (on) cutTo(director.start(time, performance.now() / 1000));
+    if (on) cutTo(director.start(time, performance.now() / 1000, speed));
     syncCams();
     pushState(true);
   }
@@ -289,6 +291,7 @@ async function boot() {
     if (on && time >= duration) { time = 0; finishedShown = false; }
     playing = on;
     app.classList.toggle('playing', on);
+    coverCard(); // the card is slim while playing, full when paused
     $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
     if (!on) pushState(true);
   }
@@ -299,6 +302,7 @@ async function boot() {
     updateUi(true);
     pushState();
   }
+  const desktop = matchMedia('(min-width: 960px)');
   // Next / previous rider by current race position, wrapping, so every rider is a few swipes away.
   const focus = $('focus');
   function stepRider(dir) {
@@ -327,10 +331,27 @@ async function boot() {
     swipe = null;
     focus.style.removeProperty('--drag');
     if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { autoOff(); stepRider(dx < 0 ? 1 : -1); }
+    // A tap keeps the full card open during playback (phones show a slim one while playing); a second tap lets it go.
+    else if (e.type === 'pointerup' && Math.abs(dx) < 8 && Math.abs(dy) < 8 && !desktop.matches) { focus.classList.toggle('pinned'); coverCard(); }
   };
   focus.addEventListener('pointerup', endSwipe);
   focus.addEventListener('pointercancel', endSwipe);
-  $('cams').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setCam(b.dataset.cam); });
+  // Phones show one camera button, the current shot; tapping it opens the others. Desktop shows them all.
+  const cams = $('cams');
+  const closeCams = () => { cams.classList.remove('open'); cams.querySelector('[aria-pressed="true"]')?.setAttribute('aria-expanded', 'false'); };
+  cams.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (!desktop.matches && !cams.classList.contains('open') && b.getAttribute('aria-pressed') === 'true') {
+      cams.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    const wasOpen = cams.classList.contains('open');
+    closeCams();
+    if (wasOpen && b.getAttribute('aria-pressed') === 'true') return; // closing the menu on the current shot changes nothing (and keeps Auto on)
+    setCam(b.dataset.cam);
+  });
+  document.addEventListener('pointerdown', e => { if (cams.classList.contains('open') && !cams.contains(e.target)) closeCams(); });
   $('play').addEventListener('click', () => setPlaying(!playing));
   $('speed').addEventListener('click', () => {
     speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
@@ -364,11 +385,10 @@ async function boot() {
   });
 
   const profileChart = renderProfile($('profile'), profile, len, riders, d => seek(timeAtDistance(riders[selected].samples, d)));
-  const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration);
+  const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration, seek);
 
   // ---- bottom sheet -------------------------------------------------------------
   const sheet = $('sheet');
-  const desktop = matchMedia('(min-width: 960px)');
   let snap = 'peek', sheetY = 0, dragStart = null;
   function snapHeights() {
     const top = sheet.getBoundingClientRect().top - sheetY;
@@ -377,11 +397,17 @@ async function boot() {
     const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
     return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }
+  // A tall sheet (seven riders fill "half" too) slides over the rider card: the card steps aside rather than show cut in half.
+  function coverCard(cardBottom = focus.getBoundingClientRect().bottom) {
+    app.classList.toggle('sheet-over-card', !desktop.matches && innerHeight - (sheet.offsetHeight - sheetY) < cardBottom - 12);
+  }
   function placeSheet(y, animate = true) {
+    const cardBottom = focus.getBoundingClientRect().bottom; // read before the writes below: one layout per drag move
     sheetY = Math.max(0, y);
     sheet.style.transition = animate ? '' : 'none';
     sheet.style.transform = desktop.matches ? '' : `translate3d(0,${sheetY}px,0)`;
     app.style.setProperty('--sheet-visible', desktop.matches ? '0px' : `${sheet.offsetHeight - sheetY}px`);
+    coverCard(cardBottom);
   }
   function setSnap(name, animate = true) {
     snap = name;
@@ -496,7 +522,7 @@ async function boot() {
       r.prog.style.transform = `scaleX(${row.d / len})`;
     });
     const me = byIndex[selected], tel = telemetryAt(riders[selected].samples, time), rider = riders[selected];
-    text('f-letter', rider.letter);
+    $('f-letter').classList.toggle('ring', rider.ring);
     text('f-name', rider.name);
     text('f-pos', me.finished ? `Finished P${me.rank} · ${shown(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
     text('f-togo', ((len - me.d) / 1000).toFixed(2));
@@ -608,7 +634,11 @@ async function boot() {
   });
 
   // ---- go ------------------------------------------------------------------------------------
-  for (const m of moments) world?.addPin({ d: m.d, label: `Video: ${m.caption}`, onClick: () => live && openMoment(m) });
+  // Clips filmed at the same spot (the summit has three) fan out side by side, each pin tappable.
+  moments.forEach((m, k) => {
+    const stack = moments.slice(0, k).filter(o => Math.abs(o.d - m.d) < 40).length;
+    world?.addPin({ d: m.d, label: `Video: ${m.caption}`, stack, onClick: () => live && openMoment(m) });
+  });
   live = true;
   select(selected);
   syncCams();

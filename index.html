@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f0d">
-<meta name="description" content="Replay a five-rider race up Coll de sa Batalla, Mallorca, in 3D: real aerial imagery and terrain, live gaps, power, heart rate and speed.">
+<meta name="description" content="Replay a group race up Coll de sa Batalla, Mallorca, in 3D: real aerial imagery and terrain, live gaps, power, heart rate and speed.">
 <meta property="og:title" content="Wielki Wyścig — Coll de sa Batalla">
-<meta property="og:description" content="A 3D race replay up Coll de sa Batalla, Mallorca. 7.8 km, five riders, every gap.">
+<meta property="og:description" content="A 3D race replay up Coll de sa Batalla, Mallorca. 7.8 km, every rider, every gap.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0f0d'/%3E%3Cpath d='M4 25 13 9l5 8 3-4 7 12z' fill='%23ffd34d'/%3E%3C/svg%3E">
 <link rel="preload" href="/terrain.json" as="fetch" crossorigin>
 <link rel="preload" href="/fonts/bc-700.woff2" as="font" type="font/woff2" crossorigin>
@@ -29,7 +29,7 @@
   <section class="focus" id="focus" aria-label="Selected rider">
     <div class="focus-head">
       <button class="fnav" id="f-prev" aria-label="Previous rider"><svg viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></svg></button>
-      <b class="letter" id="f-letter">A</b>
+      <b class="letter" id="f-letter" aria-hidden="true"></b>
       <div class="who"><strong id="f-name">—</strong><span id="f-pos">—</span></div>
       <div class="togo"><b id="f-togo">—</b><span>km to go</span></div>
       <button class="fnav" id="f-next" aria-label="Next rider"><svg viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></svg></button>
@@ -70,7 +70,7 @@
         <figure><figcaption>Heart rate <small>bpm</small></figcaption><svg id="c-hr"></svg></figure>
         <figure><figcaption>Speed <small>km/h</small></figcaption><svg id="c-speed"></svg></figure>
       </div>
-      <p class="credits" id="credits">Imagery © IGN / PNOA, CC BY 4.0 · Elevation: Mapzen / AWS Terrain Tiles · Road: MallorcaVelo GPX / © OpenStreetMap contributors (ODbL). Measured terrain covers ~6 × 9 km; the land and sea beyond it are illustrative. Riders and road drawn larger than life. Approximate segment boundaries. <span id="sim-note">All rider telemetry is simulated.</span></p>
+      <p class="credits" id="credits">Imagery © IGN / PNOA (25 cm along the road), CC BY 4.0 · Elevation © IGN MDT05, CC BY 4.0 · Road: MallorcaVelo GPX / © OpenStreetMap contributors (ODbL). Measured terrain covers ~6 × 9 km; the land and sea beyond it are illustrative. Trees stand where the aerial photo shows a crown; walls and guardrails are placed from the slope, not surveyed. Riders drawn 3× life size. Approximate segment boundaries. <span id="sim-note">All rider telemetry is simulated.</span></p>
     </div>
   </section>
 

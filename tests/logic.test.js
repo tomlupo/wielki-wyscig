@@ -39,3 +39,9 @@ test('URL state round-trips and rejects junk', () => {
   assert.deepEqual({ t: junk.t, rider: junk.rider, cam: junk.cam, speed: junk.speed, shared: junk.shared }, { t: 0, rider: null, cam: 'follow', speed: 10, shared: false });
   assert.equal(parseState('?t=99999', ctx).t, 2040);
 });
+
+test('smooth averages a centred window and keeps missing values missing', async () => {
+  const { smooth } = await import('../src/charts.js');
+  const samples = [{ t: 0, w: 100 }, { t: 10, w: 300 }, { t: 20, w: null }, { t: 30, w: 200 }, { t: 40, w: 400 }];
+  assert.deepEqual(smooth(samples, 'w', 20).map(s => s.v), [200, 200, null, 300, 300]);
+});

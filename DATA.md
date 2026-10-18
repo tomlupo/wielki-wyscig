@@ -25,7 +25,7 @@ For now, replace `data/race.json` through GitHub/backend tooling and push to `ma
 }
 ```
 
-`t` = seconds on the race clock (see Clock below); `d` = cumulative metres along the reference climb; `speed` = km/h; `watts` = W; `hr` = bpm. Use `null` for absent sensor data. Zero watts means measured coasting, not missing data. Samples must be ordered with strictly increasing timestamps and nondecreasing distance. Each rider starts at `(t=0,d=0)` and ends at the reference segment distance. Intermediate samples are interpolated. 1–12 riders are accepted; the demo layout is optimized for five.
+`t` = seconds on the race clock (see Clock below); `d` = cumulative metres along the reference climb; `speed` = km/h; `watts` = W; `hr` = bpm. Use `null` for absent sensor data. Zero watts means measured coasting, not missing data. Samples must be ordered with strictly increasing timestamps and nondecreasing distance. Each rider starts at `(t=0,d=0)` and ends at the reference segment distance. Intermediate samples are interpolated. 1–12 riders are accepted; the layout is tested with five to seven.
 
 Optional fields: race `clockOffset` (seconds, ≥ 0) and rider `officialTime` (seconds), both explained under Clock.
 
@@ -45,7 +45,7 @@ Private repository visibility does not itself protect a deployed app. Existing V
 
 `src/data/source.js` is the only place the app learns where race data comes from. A **RaceSource** is `{ load(): Promise<RaceV1> }`. `loadRace(source)` validates the result against the contract above. Everything after that point (the race model, the 3D world, the HUD, the URL state) only sees version-1 data.
 
-- **Today:** `simulatedSource()` → `GET /api/race` → `data/race.json` (synthetic riders).
+- **Today:** `simulatedSource()` → `GET /api/race` → `data/race.json` (recorded rides, or synthetic riders when `simulated` is true).
 - **GPX / FIT files:** write `gpxSource(files)` that returns a RaceV1. For each rider:
   1. Parse the track points.
   2. Project lat/lon into the terrain frame.
@@ -54,10 +54,14 @@ Private repository visibility does not itself protect a deployed app. Existing V
   5. Rebase `t` to 0 at the segment start.
   6. Keep `watts` and `hr` from the extensions. Use `null` when they are absent.
 
-  The terrain `bounds` are Web Mercator metres (EPSG:3857), and `route` x/z are east/south metres from the bounds centre, scaled by cos(latitude of the centre) (see `scripts/fit_to_race.py`).
+  The terrain `bounds` are Web Mercator metres (EPSG:3857). `route` x/z are east/south metres from the bounds centre, scaled by cos(latitude of the centre), so they are true metres. `scripts/fit_to_race.py` and `scripts/build_terrain.py` both use this.
 - **Live per-rider feed:** write a source whose `load()` returns the current snapshot. To get updates, add `subscribe(onRace)`, and rebuild the race model on each update. Live riders have not reached the summit yet, so `validateRace` needs a `live` flag that relaxes the "ends at `distanceM`" rule. This flag does not exist yet.
 
 Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSource(...))`).
+
+## Rider colours
+
+A rider's `color` is their helmet colour: it marks them everywhere (labels, standings, profile, trail, charts, results card). When two riders share a helmet colour, the one listed later is drawn as a ring instead of a dot, and with a dashed line on the results card's gap chart.
 
 ## URL state
 
@@ -71,18 +75,30 @@ Vite's development middleware serves the same `/api/race` contract. Production u
 ## Data attribution
 
 - Aerial imagery: © IGN / PNOA, CC BY 4.0, https://www.ign.es/wms-inspire/pnoa-ma
-- Elevation: Mapzen/AWS Terrain Tiles, https://registry.opendata.aws/terrain-tiles/ (see contributing-source attribution at https://github.com/tilezen/joerd/blob/master/docs/attribution.md).
+- Elevation: © IGN, MDT05 (5 m, from LiDAR), CC BY 4.0, via https://servicios.idee.es/wcs-inspire/mdt
+- Road corridor imagery: © IGN / PNOA 25 cm, CC BY 4.0, same WMS as above, in `public/corridor/`.
+- Trees: detected from that imagery (dark green crowns), so they stand where real trees do; species and height are estimated.
 - Road: https://mallorcavelo.com/gpx/serra-de-tramuntana-nord.gpx ; OpenStreetMap contributors, ODbL. Extract reversed to climb Caimari → summit.
-- All demo rider metrics are synthetic and are not physiological or performance estimates for real people.
+- `data/race.json` holds recorded rides (`"simulated": false`). When a dataset is marked simulated, its rider metrics are synthetic and are not physiological or performance estimates for real people.
 
-Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1; markers and route width are enlarged for readability.
+Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1. Riders are drawn 3× life size; the road (6 m), walls and trees are real size. Walls and guardrails are placed where the ground falls away beside the road, not from a survey.
+
+## Ground: `scripts/build_terrain.py`
+
+`uv run scripts/build_terrain.py` rebuilds the measured ground from IGN open data (`dem`, `tiles`, `trees` steps; downloads cached in `.cache/terrain/`):
+
+- `dem`: MDT05 averaged onto a 15 m grid → `public/terrain.json` `nx`/`ny`/`heights`. It prints the mean offset from the road's GPX altitude (0.0 m, 95% within 4.5 m on the current data).
+- `tiles`: 25 cm orthophoto, 256 m tiles within 170 m of the road → `public/corridor/hi/` (1024 px, desktop) and `lo/` (512 px, phones). The ground shader shows the 12 tiles nearest the camera and its subject (`src/corridor.js`).
+- `trees`: crowns found in those tiles → `public/corridor/index.json` (`src/trees.js`).
+
+The survey-wide aerial texture in `terrain.json` (~4.75 m/px) is unchanged; the corridor tiles sit on top of it near the road.
 
 ## Real rides: `scripts/fit_to_race.py`
 
-`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). Raw ride files stay in `rides/`, which is ignored by version control: they are whole rides with personal data (home location, weight, heart-rate zones), and only the trimmed climb is published.
+`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). The raw rides are kept in the repository under `rides/` (one FIT file per rider, ~5 MB for 17.10), so `data/race.json` can be rebuilt and re-checked at any time. They are whole rides with personal data (home location, weight, heart-rate zones): the site never serves them (they are outside `public/`), and only the trimmed climb in `data/race.json` is published.
 
 17.10 was built with:
 
 ```
-uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Los Locos=rides/los-locos.fit:#4fc3f7@26:59" "El Szczupak=rides/el-szczupak.fit:#ef5350@28:05" "Krzys=rides/krzys.fit:#66bb6a@30:29" "Rafi=rides/rafi.fit:#ab47bc@33:15" "El Halcon=rides/el-halcon.fit:#ff8a65@26:50" "Karol=rides/karol.fit:#26c6da"
+uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#e53935@31:34" "Los Locos=rides/los-locos.fit:#f2f2ee@26:59" "El Szczupak=rides/el-szczupak.fit:#3d8bfd@28:05" "Krzys=rides/krzys.fit:#9ea4ad@30:29" "Rafi=rides/rafi.fit:#f2f2ee@33:15" "El Halcon=rides/el-halcon.fit:#ff8a1f@26:50" "Karol=rides/karol.fit:#9ea4ad"
 ```

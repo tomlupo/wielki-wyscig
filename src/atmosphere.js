@@ -6,20 +6,21 @@
 // patched once, at import, so every built-in material with `fog: true` gets it.
 import * as THREE from 'three';
 
-export const SUN_DIR = new THREE.Vector3(-0.78, 0.36, 0.5).normalize(); // low WSW late-afternoon sun
-export const SUN_COLOR = new THREE.Color(1.0, 0.8, 0.6);
+// The ride's own light (the riders' clips, 17 Oct, 10:20–12:20 local): sun SSE, ~38° up, bright and a little hazy.
+export const SUN_DIR = new THREE.Vector3(0.27, 0.62, 0.74).normalize();
+export const SUN_COLOR = new THREE.Color(1.0, 0.94, 0.86);
 export const FAR_ALBEDO = new THREE.Color(0.078, 0.08, 0.058); // linear: average of the aerial imagery
-const FOG_DENSITY = 1.25e-4, FOG_FALLOFF = 0.0011, FOG_BASE = 200; // per m; per m of height; reference height (m)
+const FOG_DENSITY = 1.7e-4, FOG_FALLOFF = 0.0011, FOG_BASE = 200; // per m; per m of height; reference height (m)
 
 const f = v => v.toFixed(5);
 export const SKY_GLSL = `
 const vec3 SUN_DIR = vec3(${f(SUN_DIR.x)}, ${f(SUN_DIR.y)}, ${f(SUN_DIR.z)});
 vec3 skyColor(vec3 d) {
   float y = clamp(d.y, 0.0, 1.0), mu = max(dot(d, SUN_DIR), 0.0);
-  vec3 c = mix(vec3(0.5, 0.6, 0.76), vec3(0.05, 0.14, 0.42), pow(y, 0.5));
+  vec3 c = mix(vec3(0.66, 0.71, 0.78), vec3(0.2, 0.34, 0.62), pow(y, 0.6));
   float low = 1.0 - smoothstep(0.0, 0.4, y);
-  c *= mix(vec3(1.0), vec3(1.16, 1.0, 0.84), low * 0.6);     // warm band low in the sky
-  c += vec3(1.0, 0.58, 0.28) * (pow(mu, 5.0) * 0.5 * (0.35 + 0.65 * low) + pow(mu, 48.0) * 0.5);
+  c *= mix(vec3(1.0), vec3(1.05, 1.0, 0.95), low * 0.5);     // a faint warm band low in the sky
+  c += vec3(1.0, 0.88, 0.7) * (pow(mu, 5.0) * 0.25 * (0.35 + 0.65 * low) + pow(mu, 48.0) * 0.5);
   return c;
 }
 vec3 hazeColor(vec3 d) { return skyColor(normalize(vec3(d.x, max(d.y, 0.0) * 0.4 + 0.02, d.z))); }
@@ -70,12 +71,12 @@ export function createSky() {
         vec3 d = normalize(vDir);
         vec3 c = skyColor(d);
         float mu = max(dot(d, SUN_DIR), 0.0);
-        // thin high cloud, lit warm on the sun side
+        // fair-weather cumulus, as in the clips: white, brighter towards the sun
         if (d.y > 0.0) {
           vec2 p = d.xz / (d.y + 0.12) * 1.6 + vec2(uTime * 0.004, 0.0);
           float n = vn(p) * 0.5 + vn(p * 2.1 + 3.7) * 0.3 + vn(p * 4.3 - 1.3) * 0.2;
-          float cl = smoothstep(0.52, 0.86, n) * smoothstep(0.02, 0.3, d.y);
-          c = mix(c, vec3(1.0, 0.9, 0.8) * (0.75 + 0.9 * pow(mu, 4.0)), cl * 0.5);
+          float cl = smoothstep(0.46, 0.78, n) * smoothstep(0.02, 0.3, d.y);
+          c = mix(c, vec3(0.94, 0.95, 0.97) * (0.8 + 0.5 * pow(mu, 4.0)) * (0.82 + 0.25 * n), cl * 0.8);
         }
         c += vec3(1.0, 0.85, 0.6) * smoothstep(0.9993, 0.99965, mu) * 14.0; // sun disc (blooms)
         gl_FragColor = vec4(c, 1.0);

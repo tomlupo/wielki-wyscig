@@ -114,12 +114,15 @@ async function boot() {
   // colour); the name for the focus rider.
   function drawLabels(g, shot, c, f) {
     const cam = world.camera, items = [];
+    // labels: 'all' (a dot each, the name for the focus rider), 'names', or a list of riders (only those, named)
+    const only = Array.isArray(shot.labels) ? shot.labels : null;
     model.riders.forEach((r, i) => {
+      if (only && !only.includes(i)) return;
       const p = world.riderPosition(i).clone();
       p.y += 11;
       p.project(cam);
       if (p.z >= 1 || Math.abs(p.x) > 1.05 || Math.abs(p.y) > 1.05) return;
-      items.push({ i, x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H, focus: i === shot.focus || (shot.labels === 'names') });
+      items.push({ i, x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H, focus: i === shot.focus || shot.labels === 'names' || !!only });
     });
     const S = overlay.S;
     // A bunch would stack its labels into an unreadable pile: the first label of a pile stands for it with "+N"

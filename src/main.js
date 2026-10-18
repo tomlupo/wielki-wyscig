@@ -51,6 +51,8 @@ async function boot() {
   // ---- race model ---------------------------------------------------------
   const riders = race.riders.map((r, i) => ({ ...r, index: i, letter: String.fromCharCode(65 + i), finish: r.samples.at(-1).t }));
   const duration = Math.max(...riders.map(r => r.finish));
+  // The official clock starts before the 3D road (DATA.md, clockOffset): every time shown is on it.
+  const clockOffset = race.clockOffset ?? 0, shown = t => formatClock(t + clockOffset + 1e-6);
   const route = terrain.route, len = route.at(-1)[3];
   const stats = climbStats(route), profile = elevationProfile(route);
   const distanceAt = (i, t) => interpolate(riders[i].samples, t, 'd');
@@ -79,7 +81,7 @@ async function boot() {
   $('intro-meta').textContent = `${km} km · ${Math.round(stats.start)} → ${Math.round(stats.top)} m · ${riders.length} riders`;
   $('badge-text').textContent = race.simulated ? 'Simulated' : 'Recorded';
   if (!race.simulated) $('sim-note').textContent = 'Recorded telemetry; missing sensor values are shown as —.';
-  $('duration').textContent = '/ ' + formatClock(duration);
+  $('duration').textContent = '/ ' + shown(duration);
   const scrub = $('scrub');
   scrub.max = String(Math.ceil(duration));
   $('speed').textContent = speed + '×';
@@ -112,7 +114,7 @@ async function boot() {
   const listed = [...events, ...moments.map(m => ({ t: m.t, type: 'media', rider: m.rider, text: m.caption, moment: m }))].sort((a, b) => a.t - b.t);
   const eventItems = listed.map(e => {
     const li = document.createElement('li'), r = riders[e.rider];
-    li.innerHTML = `<button style="--c:${r.color}" data-t="${e.t}"><time>${formatClock(e.t)}</time><svg viewBox="0 0 24 24" aria-hidden="true">${EVENT_ICONS[e.type]}</svg><span></span></button>`;
+    li.innerHTML = `<button style="--c:${r.color}" data-t="${e.t}"><time>${shown(e.t)}</time><svg viewBox="0 0 24 24" aria-hidden="true">${EVENT_ICONS[e.type]}</svg><span></span></button>`;
     li.querySelector('span').textContent = e.text;
     li.querySelector('button').addEventListener('click', () => e.moment ? openMoment(e.moment) : jumpTo(e));
     $('events-list').append(li);
@@ -489,14 +491,14 @@ async function boot() {
       r.li.style.order = n;
       r.btn.setAttribute('aria-pressed', String(row.index === selected));
       r.rank.textContent = row.rank;
-      r.gap.textContent = row.finished ? (row.rank === 1 ? formatClock(row.finish) : formatGap(row.gap)) : row.rank === 1 ? 'Leader' : formatGap(row.gap);
+      r.gap.textContent = row.finished ? (row.rank === 1 ? shown(row.finish) : formatGap(row.gap)) : row.rank === 1 ? 'Leader' : formatGap(row.gap);
       r.sens.textContent = row.finished ? 'Finished' : `${tel.watts ?? '—'} W · ${tel.hr ?? '—'} bpm`;
       r.prog.style.transform = `scaleX(${row.d / len})`;
     });
     const me = byIndex[selected], tel = telemetryAt(riders[selected].samples, time), rider = riders[selected];
     text('f-letter', rider.letter);
     text('f-name', rider.name);
-    text('f-pos', me.finished ? `Finished P${me.rank} · ${formatClock(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
+    text('f-pos', me.finished ? `Finished P${me.rank} · ${shown(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
     text('f-togo', ((len - me.d) / 1000).toFixed(2));
     text('f-w', me.finished ? '—' : String(tel.watts ?? '—'));
     text('f-hr', me.finished ? '—' : String(tel.hr ?? '—'));
@@ -504,7 +506,7 @@ async function boot() {
     const grade = gradeAt(route, me.d, 200); // same smoothing scale as the profile colours
     text('f-g', grade.toFixed(1));
     $('f-g').style.color = `rgb(${gradeColor(grade)})`;
-    text('clock', formatClock(time));
+    text('clock', shown(time));
     scrub.value = String(Math.round(time));
     scrub.style.setProperty('--p', (time / duration * 100).toFixed(2) + '%');
     profileChart.update(riders.map((_, i) => distanceAt(i, time)), selected);
@@ -580,7 +582,7 @@ async function boot() {
     card.hidden = false;
     cardFile = null;
     $('card-share').hidden = true;
-    await drawCard(cardCanvas, { riders, events, route, profile, stats, title: race.title ?? 'Coll de sa Batalla', place: 'Mallorca' });
+    await drawCard(cardCanvas, { riders, events, route, profile, stats, title: race.title ?? 'Coll de sa Batalla', place: 'Mallorca', clockOffset });
     // The file is made now, so Share runs inside the tap (Safari drops a share started after an await).
     const blob = await new Promise(r => cardCanvas.toBlob(r, 'image/png'));
     if (!blob) return;

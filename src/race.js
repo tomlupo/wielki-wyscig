@@ -1,6 +1,7 @@
 export function validateRace(race) {
   if (race?.version !== 1 || !Array.isArray(race.riders) || !race.riders.length || race.riders.length > 12) throw new Error('Invalid race dataset. Expected version 1 and 1–12 riders.');
   if (!(race.distanceM > 0)) throw new Error('Race distance must be positive.');
+  if (race.clockOffset != null && !(Number.isFinite(race.clockOffset) && race.clockOffset >= 0)) throw new Error('Invalid clock offset.');
   const ids = new Set();
   for (const rider of race.riders) {
     if (typeof rider.id !== 'string' || ids.has(rider.id) || typeof rider.name !== 'string' || rider.name.length > 48 || !/^#[0-9a-f]{6}$/i.test(rider.color)) throw new Error('Invalid rider identity or color.');

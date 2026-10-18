@@ -46,7 +46,7 @@ Private repository visibility does not itself protect a deployed app. Existing V
   5. Rebase `t` to 0 at the segment start.
   6. Keep `watts` and `hr` from the extensions. Use `null` when they are absent.
 
-  The terrain `bounds` are projected metres (UTM, EPSG:25831), and `route` x/z are east/south metres from the terrain centre. Validate that projection against the source GPX before you trust it.
+  The terrain `bounds` are Web Mercator metres (EPSG:3857). `route` x/z are east/south metres from the bounds centre, scaled by cos(latitude of the centre), so they are true metres. `scripts/fit_to_race.py` and `scripts/build_terrain.py` both use this.
 - **Live per-rider feed:** write a source whose `load()` returns the current snapshot. To get updates, add `subscribe(onRace)`, and rebuild the race model on each update. Live riders have not reached the summit yet, so `validateRace` needs a `live` flag that relaxes the "ends at `distanceM`" rule. This flag does not exist yet.
 
 Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSource(...))`).
@@ -63,11 +63,23 @@ Vite's development middleware serves the same `/api/race` contract. Production u
 ## Data attribution
 
 - Aerial imagery: © IGN / PNOA, CC BY 4.0, https://www.ign.es/wms-inspire/pnoa-ma
-- Elevation: Mapzen/AWS Terrain Tiles, https://registry.opendata.aws/terrain-tiles/ (see contributing-source attribution at https://github.com/tilezen/joerd/blob/master/docs/attribution.md).
+- Elevation: © IGN, MDT05 (5 m, from LiDAR), CC BY 4.0, via https://servicios.idee.es/wcs-inspire/mdt
+- Road corridor imagery: © IGN / PNOA 25 cm, CC BY 4.0, same WMS as above, in `public/corridor/`.
+- Trees: detected from that imagery (dark green crowns), so they stand where real trees do; species and height are estimated.
 - Road: https://mallorcavelo.com/gpx/serra-de-tramuntana-nord.gpx ; OpenStreetMap contributors, ODbL. Extract reversed to climb Caimari → summit.
 - `data/race.json` holds recorded rides (`"simulated": false`). When a dataset is marked simulated, its rider metrics are synthetic and are not physiological or performance estimates for real people.
 
-Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1; markers and route width are enlarged for readability.
+Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1. Riders are drawn 3× life size; the road (6 m), walls and trees are real size. Walls and guardrails are placed where the ground falls away beside the road, not from a survey.
+
+## Ground: `scripts/build_terrain.py`
+
+`uv run scripts/build_terrain.py` rebuilds the measured ground from IGN open data (`dem`, `tiles`, `trees` steps; downloads cached in `.cache/terrain/`):
+
+- `dem`: MDT05 averaged onto a 15 m grid → `public/terrain.json` `nx`/`ny`/`heights`. It prints the mean offset from the road's GPX altitude (0.0 m, 95% within 4.5 m on the current data).
+- `tiles`: 25 cm orthophoto, 256 m tiles within 170 m of the road → `public/corridor/hi/` (1024 px, desktop) and `lo/` (512 px, phones). The ground shader shows the 12 tiles nearest the camera and its subject (`src/corridor.js`).
+- `trees`: crowns found in those tiles → `public/corridor/index.json` (`src/trees.js`).
+
+The survey-wide aerial texture in `terrain.json` (~4.75 m/px) is unchanged; the corridor tiles sit on top of it near the road.
 
 ## Real rides: `scripts/fit_to_race.py`
 

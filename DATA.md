@@ -31,7 +31,7 @@ Optional fields: race `clockOffset` (seconds, ≥ 0) and rider `officialTime` (s
 
 ### Clock
 
-For a mass start, every rider is on one race clock: `t=0` is the first rider over the start of the reference road, and a rider still behind the line keeps `d=0` until they cross it. So the order on the clock is the order they really reached the top.
+For a mass start, every rider is on one race clock: `t=0` is the first rider over the start of the reference road, and a rider still behind the line keeps `d=0` until they cross it. The mass start counts as one start for everyone, so finishing times and order follow the official times below.
 
 Official segment times (Strava) are the result, and the replay shows them exactly. Strava's segment starts ~160 m before the reference road, so `clockOffset` (the median gap between official and GPS times, 33.7 s on 17.10) is added to every time the app shows. A rider's finish is at `officialTime − clockOffset` on the race clock; their GPS clock is nudged by a few seconds over the climb to land there. A rider with no official time gets GPS time + `clockOffset` as an estimate (Karol, 33:07 on 17.10).
 

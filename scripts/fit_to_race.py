@@ -9,10 +9,8 @@
     uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/lobo.fit" ...
 
 Each argument is NAME=PATH[:#colour][@MM:SS]. @MM:SS is the rider's official
-segment time (e.g. from Strava). It is kept as `officialTime` for display only:
-Strava's segment starts ~160 m before the reference road, so its times run
-~40 s longer, and stretching a GPS clock to it would move riders against each
-other. Whole rides are fine: the climb is found automatically by matching GPS
+segment time (e.g. from Strava), and the result: it is kept as `officialTime`
+and the rider tops out on it (see Clock). Whole rides are fine: the climb is found automatically by matching GPS
 points to the reference road in public/terrain.json (`route`), and cut at the
 FIRST arrival at the summit, so a café stop at the top does not count.
 
@@ -22,9 +20,16 @@ recording logs only every ~9 s) and measured EDGE_M inside the road, where the
 GPS is clean, then carried to the line at the rider's own speed there.
 --mass-start: everyone rode off together, so all riders share one race clock
 whose zero is the first rider over the start line; a rider later over the line
-waits at d=0 until then, and the finishing order is the order they really
-reached the top. Without it, every rider's own start is their zero (a time
-trial).
+waits at d=0 until then. Without it, every rider's own start is their zero (a
+time trial).
+Official times. Strava's segment starts ~160 m before the reference road, so
+each official time is longer than the rider's GPS time on our road by about
+the same lead-in (median: 33.7 s on 17.10), written as `clockOffset` and added
+to every time the app shows. Each rider tops out at official − lead-in from the
+race clock's zero (a mass start counts as one start for everyone, as Strava's
+own timing does); the GPS clock is nudged by a few seconds to land there, never
+stretched by the whole lead-in. A rider without an official time gets GPS time
++ lead-in, so the finishing order follows the official times.
 
 Projection: terrain `bounds` are Web Mercator (EPSG:3857) metres; `route` x/z
 are east/south metres from the bounds centre, scaled by cos(latitude of the

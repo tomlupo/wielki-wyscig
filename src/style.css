@@ -59,6 +59,7 @@ svg { display: block; }
 .rlabel span { display: none; text-transform: uppercase; }
 .rlabel.sel { height: 30px; box-shadow: 0 0 0 2px var(--c), 0 8px 22px rgba(0, 0, 0, 0.45); }
 .rlabel.sel span { display: inline; }
+.rlabel em { margin-left: -1px; color: var(--dim); font: 600 12px/1 var(--num); font-style: normal; letter-spacing: 0.02em; }
 .rlabel::before { content: ''; position: absolute; inset: -10px; }
 .mark { position: absolute; left: 0; top: 0; font: 600 12px/1 var(--num); letter-spacing: 0.14em; text-transform: uppercase; color: #fff;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); white-space: nowrap; margin: -6px 0 0 0; translate: -50% 0; }
@@ -75,7 +76,7 @@ svg { display: block; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(255, 77, 90, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 90, 0); } }
 
 /* ---- selected rider card ---------------------------------------------------- */
-.focus { position: absolute; z-index: 3; top: calc(var(--safe-t) + 78px); left: calc(var(--safe-l) + var(--gutter)); right: calc(var(--safe-r) + var(--gutter));
+.focus { position: absolute; z-index: 3; top: calc(var(--safe-t) + 88px); left: calc(var(--safe-l) + var(--gutter)); right: calc(var(--safe-r) + var(--gutter));
   padding: 10px 12px 9px; border-radius: 16px; background: var(--glass); border: 1px solid var(--line);
   box-shadow: inset 3px 0 0 var(--rider), 0 10px 30px rgba(0, 0, 0, 0.25); }
 .focus-head { display: flex; align-items: center; gap: 10px; }
@@ -107,7 +108,7 @@ svg { display: block; }
 .fnav svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- camera buttons ----------------------------------------------------------- */
-.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 202px); display: flex; flex-direction: column; gap: 6px; }
+.cams { position: absolute; z-index: 3; right: calc(var(--safe-r) + var(--gutter)); top: calc(var(--safe-t) + 212px); display: flex; flex-direction: column; gap: 6px; }
 .cams button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); position: relative; transition: background 0.2s, color 0.2s, transform 0.15s; }
 .cams button:active { transform: scale(0.94); }
 .cams svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -181,7 +182,9 @@ svg { display: block; }
 .charts figcaption { font: 600 12px/1 var(--num); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
 .charts figcaption small { font-size: 11px; letter-spacing: 0.06em; color: var(--faint); }
 .charts svg { width: 100%; height: 74px; overflow: visible; }
-.c-line { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+.c-line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.c-raw { fill: none; stroke-width: 1; stroke-linejoin: round; opacity: 0.22; }
+.c-hit { fill: transparent; cursor: ew-resize; }
 .c-grid { stroke: rgba(255, 255, 255, 0.07); }
 .c-tick { fill: var(--faint); font: 500 10px/1 var(--num); }
 .c-cursor { stroke: #fff; stroke-width: 1.2; opacity: 0.7; }
@@ -280,7 +283,7 @@ svg { display: block; }
 .loader .bar, .loader p { width: min(260px, 70vw); margin-left: auto; margin-right: auto; }
 .loader .bar { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .loader .bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; transform: scaleX(0.05); transition: transform 0.3s; }
-.loader p { margin: 14px 0 0; color: var(--dim); font-size: 13px; }
+.loader p { margin: 14px auto 0; color: var(--dim); font-size: 13px; }
 .toast { position: absolute; z-index: 9; left: 50%; top: calc(var(--safe-t) + 14px); translate: -50% -20px; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: var(--glass-strong); border: 1px solid var(--line); font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.3s, translate 0.3s; overflow-wrap: anywhere; }
 .toast.in { opacity: 1; translate: -50% 0; }
 
@@ -300,11 +303,40 @@ svg { display: block; }
 }
 @media (max-height: 640px) and (max-width: 959px) {
   .focus .stats { display: none; }
-  .cams { top: calc(var(--safe-t) + 142px); }
+  .cams { top: calc(var(--safe-t) + 152px); }
 }
+/* Phones, while playing: a slim rider card — name, place and the four numbers on one line, no labels —
+   so the race gets the screen. Paused, or tapped (pinned), it is the full card again. */
+@media (max-width: 959px) {
+  .app.playing .focus:not(.pinned) .stats { margin-top: 6px; padding-top: 6px; }
+  .app.playing .focus:not(.pinned) .stats dt { display: none; }
+  .app.playing .focus:not(.pinned) .stats dd { margin: 0; }
+  .app.playing .focus:not(.pinned) .stats b { font-size: 17px; }
+  .app.playing .focus:not(.pinned) .stats small { font-size: 11px; margin-left: 2px; }
+  .app.playing .focus:not(.pinned) .letter { width: 24px; height: 24px; font-size: 14px; }
+  .app.playing .focus:not(.pinned) .who strong { font-size: 17px; }
+  .app.playing .focus:not(.pinned) .who span { font-size: 13px; }
+  .app.playing .focus:not(.pinned) .togo b { font-size: 20px; }
+  .app.playing .focus:not(.pinned) .togo span { font-size: 10px; }
+  .app.playing .focus:not(.pinned) { padding-top: 8px; padding-bottom: 7px; }
+  .app.playing .cams { top: calc(var(--safe-t) + 178px); }
+
+  /* One camera button: the current shot. Tapped, the others drop out under it. */
+  .cams button { order: 1; }
+  .cams button[aria-pressed='true'] { order: 0; }
+  .cams:not(.open) button:not([aria-pressed='true']) { display: none; }
+  .cams:not(.open) button[aria-pressed='true']::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 0; height: 0;
+    border: 3.5px solid transparent; border-right-color: currentColor; border-bottom-color: currentColor; opacity: 0.55; }
+  .cams.open button:not([aria-pressed='true']) { animation: cam-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+@keyframes cam-in { from { opacity: 0; transform: translateY(-8px) scale(0.9); } }
+
+/* Phones: a tall sheet reaches up over the rider card and the camera rail. Both are out of reach under it,
+   so they step aside instead of showing cut in half (main.js sets the class). */
+.app.sheet-over-card :is(.focus, .cams) { opacity: 0; pointer-events: none; transition: opacity 0.25s; }
 /* Landscape phones: no height for a column, so the rail is a row on the right, just above the sheet. */
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 959px) {
-  .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
+  .cams, .app.playing .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
   .cams button { width: 40px; height: 40px; border-radius: 12px; }
   .cams svg { width: 20px; height: 20px; }
   .tv-cap { max-width: calc(100% - 2 * var(--gutter) - 240px); }

@@ -286,13 +286,14 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     const label = document.createElement('button');
     label.className = 'rlabel';
     label.style.setProperty('--c', data.color);
-    label.innerHTML = `<b>${data.letter}</b><span></span>`;
+    label.innerHTML = `<b>${data.letter}</b><span></span><em hidden></em>`;
     label.querySelector('span').textContent = data.name;
+    const more = label.querySelector('em');
     label.setAttribute('aria-label', `Follow ${data.name}`);
     label.addEventListener('click', e => { e.stopPropagation(); onSelect(i); });
     labels.append(label);
 
-    return { g, body, legs, beam, trail, label, shadow, puck, lane: (i - (race.riders.length - 1) / 2) * 0.22, phase: i * 1.7, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1) };
+    return { g, body, legs, beam, trail, label, more, shadow, puck, lane: (i - (race.riders.length - 1) / 2) * 0.22, phase: i * 1.7, pos: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1) };
   });
 
   function placeBetween(mesh, a, b, r, keepScale = false) {
@@ -639,6 +640,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
 
   // ---- frame ----------------------------------------------------------------
   const currentD = race.riders.map(() => 0);
+  const labelOrder = () => race.riders.map((_, i) => i).sort((a, b) => (b === rig.selected) - (a === rig.selected) || currentD[b] - currentD[a]);
   const project = new THREE.Vector3(), trailP = new THREE.Vector3(), trailS = new THREE.Vector3();
   let lastNow = performance.now(), slowFrames = 0, frames = 0, w = 1, h = 1, insetRight = 0, lastKey = '', keepOutBottom = 0;
   const post = createPost(renderer, scene, camera, { quality: lite ? 'low' : 'high' });
@@ -764,16 +766,29 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       b.visible = b.material.opacity > 0.01;
     }
 
-    // HTML labels follow their 3D anchors.
-    riders.forEach((r, i) => {
+    // HTML labels follow their 3D anchors. Riders in a bunch would stack their labels into an
+    // unreadable pile (on a phone, most of the time): the first label of a pile stands for it with "+N".
+    // The selected rider claims its place first, then riders by position on the road.
+    const placed = [];
+    for (const i of labelOrder()) {
+      const r = riders[i], sel = i === rig.selected;
       project.copy(r.pos).y += 2.2 * RIDER_SCALE;
       project.project(camera);
-      const visible = project.z < 1 && Math.abs(project.x) < 1.05 && Math.abs(project.y) < 1.05;
+      const x = (project.x * 0.5 + 0.5) * w, y = (-project.y * 0.5 + 0.5) * h, width = sel ? 44 + 8 * race.riders[i].name.length : 34;
+      let visible = project.z < 1 && Math.abs(project.x) < 1.05 && Math.abs(project.y) < 1.05;
+      const host = visible && placed.find(p => Math.abs(p.x - x) < (p.width + width) / 2 + 2 && Math.abs(p.y - y) < 28);
+      if (host) { host.more++; visible = false; }
       r.label.hidden = !visible;
-      if (visible) r.label.style.transform = `translate3d(${(project.x * 0.5 + 0.5) * w}px,${(-project.y * 0.5 + 0.5) * h}px,0)`;
-      r.label.classList.toggle('sel', i === rig.selected);
-      r.label.style.zIndex = i === rig.selected ? 3 : 2;
-    });
+      r.label.classList.toggle('sel', sel);
+      r.label.style.zIndex = sel ? 3 : 2;
+      if (!visible) continue;
+      r.label.style.transform = `translate3d(${x}px,${y}px,0)`;
+      placed.push({ r, x, y, width, more: 0 });
+    }
+    for (const p of placed) {
+      const more = p.more ? `+${p.more}` : '';
+      if (p.r.more.textContent !== more) { p.r.more.textContent = more; p.r.more.hidden = !more; }
+    }
     for (const m of marks) {
       project.copy(m.p).project(camera);
       const visible = project.z < 1 && Math.abs(project.x) < 0.95 && Math.abs(project.y) < 0.95 && camera.position.distanceTo(m.p) > 250

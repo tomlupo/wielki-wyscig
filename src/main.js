@@ -46,6 +46,7 @@ async function boot() {
     loadRace(),
   ]);
   setProgress(0.9);
+  $('load-msg').textContent = 'Building the 3D climb…'; // the slow part on a phone: meshes and shaders, with no bytes to count
   if (Math.abs(race.distanceM - terrain.route.at(-1)[3]) > 1) throw new Error('Race distance does not match this climb.');
 
   // ---- race model ---------------------------------------------------------
@@ -297,6 +298,7 @@ async function boot() {
     updateUi(true);
     pushState();
   }
+  const desktop = matchMedia('(min-width: 960px)');
   // Next / previous rider by current race position, wrapping, so every rider is a few swipes away.
   const focus = $('focus');
   function stepRider(dir) {
@@ -325,10 +327,25 @@ async function boot() {
     swipe = null;
     focus.style.removeProperty('--drag');
     if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { autoOff(); stepRider(dx < 0 ? 1 : -1); }
+    // A tap keeps the full card open during playback (phones show a slim one while playing); a second tap lets it go.
+    else if (e.type === 'pointerup' && Math.abs(dx) < 8 && Math.abs(dy) < 8 && !desktop.matches) focus.classList.toggle('pinned');
   };
   focus.addEventListener('pointerup', endSwipe);
   focus.addEventListener('pointercancel', endSwipe);
-  $('cams').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setCam(b.dataset.cam); });
+  // Phones show one camera button, the current shot; tapping it opens the others. Desktop shows them all.
+  const cams = $('cams');
+  const closeCams = () => { cams.classList.remove('open'); cams.querySelector('[aria-pressed="true"]')?.setAttribute('aria-expanded', 'false'); };
+  cams.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (!desktop.matches && !cams.classList.contains('open') && b.getAttribute('aria-pressed') === 'true') {
+      cams.classList.add('open'); b.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    closeCams();
+    setCam(b.dataset.cam);
+  });
+  document.addEventListener('pointerdown', e => { if (cams.classList.contains('open') && !cams.contains(e.target)) closeCams(); });
   $('play').addEventListener('click', () => setPlaying(!playing));
   $('speed').addEventListener('click', () => {
     speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
@@ -362,11 +379,10 @@ async function boot() {
   });
 
   const profileChart = renderProfile($('profile'), profile, len, riders, d => seek(timeAtDistance(riders[selected].samples, d)));
-  const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration);
+  const charts = createCharts([$('c-watts'), $('c-hr'), $('c-speed')], duration, seek);
 
   // ---- bottom sheet -------------------------------------------------------------
   const sheet = $('sheet');
-  const desktop = matchMedia('(min-width: 960px)');
   let snap = 'peek', sheetY = 0, dragStart = null;
   function snapHeights() {
     const top = sheet.getBoundingClientRect().top - sheetY;
@@ -380,6 +396,8 @@ async function boot() {
     sheet.style.transition = animate ? '' : 'none';
     sheet.style.transform = desktop.matches ? '' : `translate3d(0,${sheetY}px,0)`;
     app.style.setProperty('--sheet-visible', desktop.matches ? '0px' : `${sheet.offsetHeight - sheetY}px`);
+    // A tall sheet (seven riders fill "half" too) slides over the rider card: the card steps aside rather than show cut in half.
+    app.classList.toggle('sheet-over-card', !desktop.matches && innerHeight - (sheet.offsetHeight - sheetY) < focus.getBoundingClientRect().bottom - 12);
   }
   function setSnap(name, animate = true) {
     snap = name;

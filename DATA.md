@@ -37,7 +37,7 @@ Official segment times (Strava) are the result, and the replay shows them exactl
 
 Before supplying recorded data, trim each recording to the same segment and map-match its positions to the reference road; do not substitute entire-ride cumulative distance. FIT is preferred for preserving power and heart-rate channels.
 
-The reference road is `public/terrain.json` → `route`, whose entries are `[eastMetres,southMetres,gpxAltitudeMetres,cumulativeDistanceMetres]`. Its current length is 7988.28 m: on 18.10 the start was moved 207 m earlier, along the median of the seven riders' own GPS lead-in, so that the automatic GPS times land within ~10 s of the official Strava segment times (before, every rider came out ~47 s short). The terrain mesh uses separate DEM heights, so displayed terrain height may differ from GPX altitude.
+The reference road is `public/terrain.json` → `route`, whose entries are `[eastMetres,southMetres,gpxAltitudeMetres,cumulativeDistanceMetres]`. Its current length is 7938.21 m: on 18.10 the start was moved 157 m earlier, along the median of the seven riders' own GPS lead-in, so that the automatic GPS times land within 2–13 s of the official Strava segment times (before, every rider came out ~47 s short). The terrain mesh uses separate DEM heights, so displayed terrain height may differ from GPX altitude.
 
 Private repository visibility does not itself protect a deployed app. Existing Vercel Deployment Protection remains in place. Review access deliberately before adding personal activity data.
 

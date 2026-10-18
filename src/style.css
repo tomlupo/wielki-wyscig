@@ -163,7 +163,7 @@ svg { display: block; }
 .p-dot circle { fill: var(--c); stroke: #0d110f; stroke-width: 1.5; }
 .p-dot.sel circle { r: 8.5px; stroke: #fff; stroke-width: 2; }
 .p-dot.ring circle { fill: #111614; stroke: var(--c); stroke-width: 3.2; }
-.p-dot.ring.sel circle { stroke: var(--c); stroke-width: 3.6; }
+.p-dot.ring.sel circle { stroke: var(--c); stroke-width: 3.6; filter: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 0.6px #fff); } /* the white selection cue, outside the ring */
 .p-hit { fill: transparent; cursor: pointer; }
 
 .sec { flex: none; margin: 18px 0 8px; font: 600 12px/1 var(--num); letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
@@ -316,7 +316,7 @@ svg { display: block; }
   .app.playing .focus:not(.pinned) .stats dd { margin: 0; }
   .app.playing .focus:not(.pinned) .stats b { font-size: 17px; }
   .app.playing .focus:not(.pinned) .stats small { font-size: 11px; margin-left: 2px; }
-  .app.playing .focus:not(.pinned) .letter { width: 24px; height: 24px; font-size: 14px; }
+  .app.playing .focus:not(.pinned) .letter { width: 20px; height: 20px; }
   .app.playing .focus:not(.pinned) .who strong { font-size: 17px; }
   .app.playing .focus:not(.pinned) .who span { font-size: 13px; }
   .app.playing .focus:not(.pinned) .togo b { font-size: 20px; }

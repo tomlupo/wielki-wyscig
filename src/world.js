@@ -4,11 +4,14 @@ import * as THREE from 'three';
 import { gradeAt, gradeColor } from './profile.js';
 import { SUN_DIR, SUN_COLOR, createSky, createSea, createFarLand } from './atmosphere.js';
 import { buildTerrain } from './terrain.js';
+import { createCorridor } from './corridor.js';
+import { buildTrees } from './trees.js';
+import { buildRoad } from './roadside.js';
 import { createPost } from './post.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
-const RIDER_SCALE = 5; // riders are drawn 5× life size so they read on a 31 m terrain grid
-const ROAD_LIFT = 1.6, ROAD_RADIUS = 2.6;
+const RIDER_SCALE = 3; // riders are drawn 3× life size: they read from the moto, and do not tower over real-size trees
+const ROAD_LIFT = 1.1, ROAD_RADIUS = 3.1; // a 6 m road, as on the climb; lifted a little over the 15 m mesh, skirts hide the rest
 // Camera framings: offsets of the follow rig around the rider (theta: around, 0 = behind;
 // phi: from vertical; fov: vertical degrees on a landscape screen, ×1.3 on a portrait one).
 // Wide and long-lens on purpose: the riders sit IN the landscape, their labels carry them.
@@ -35,7 +38,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.3;
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', '3D replay of the climb over aerial imagery and measured terrain');
@@ -47,13 +50,24 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
 
   // ---- terrain, sky and light ---------------------------------------------
   const { width, depth } = terrain;
-  const { ground, elevation, textureReady } = await buildTerrain({ terrain, renderer, lite });
+  // 25 cm imagery along the road: phones take the 0.5 m tiles (a quarter of the memory).
+  const corridor = createCorridor({ renderer, hi: !coarse });
+  const { ground, elevation, textureReady } = await buildTerrain({ terrain, renderer, lite, phone: coarse, corridor });
   scene.add(ground);
+  // The tile index and the trees arrive after the first picture: the race never waits for them.
+  let trees = null, sceneDirty = false;
+  fetch('/corridor/index.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(async index => {
+    corridor.setIndex(index, width, depth);
+    const built = await buildTrees({ index, terrain, elevation, lite, phone: coarse });
+    scene.add(built.group);
+    trees = built;
+    sceneDirty = true;
+  }).catch(error => console.warn('corridor imagery unavailable', error));
   await breathe();
   const sky = createSky(), sea = createSea();
   scene.add(sky, sea, createFarLand({ width, depth, elevation }));
-  scene.add(new THREE.HemisphereLight(0xc2d6ff, 0x6a5038, 1.7));
-  const sun = new THREE.DirectionalLight(SUN_COLOR, 5.2);
+  scene.add(new THREE.HemisphereLight(0xd2dce6, 0x786650, 2.1)); // a bright, slightly overcast sky
+  const sun = new THREE.DirectionalLight(SUN_COLOR, 4.4);
   sun.position.copy(SUN_DIR).multiplyScalar(9000);
   scene.add(sun, sun.target);
 
@@ -86,46 +100,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   for (let d = 0; d < len; d += 8) roadPts.push(roadPoint(d, new THREE.Vector3(), ROAD_LIFT));
   roadPts.push(roadPoint(len, new THREE.Vector3(), ROAD_LIFT));
   const gradeRGB = d => gradeColor(gradeAt(route, d)).map(v => (v / 255) ** 2.2);
-  // A strip along the road: `across` rows of [offset in road half-widths, height], one colour per row and point.
-  function strip(across, lift, color) {
-    const K = across.length, pos = new Float32Array(roadN * K * 3), col = new Float32Array(roadN * K * 4), idx = [];
-    const p = new THREE.Vector3(), dir = new THREE.Vector3(), side = new THREE.Vector3();
-    for (let k = 0; k < roadN; k++) {
-      const d = Math.min(len, k * STEP);
-      roadPoint(d, p, lift);
-      side.crossVectors(roadDir(d, dir, 10), UP).normalize();
-      across.forEach(([s, dy], j) => {
-        pos.set([p.x + side.x * s * ROAD_RADIUS, p.y + dy, p.z + side.z * s * ROAD_RADIUS], (k * K + j) * 3);
-        col.set(color(d, j), (k * K + j) * 4);
-      });
-      if (k) for (let j = 0; j < K - 1; j++) { const a = (k - 1) * K + j, b = k * K + j; idx.push(a, b, a + 1, b, b + 1, a + 1); }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
-    g.setIndex(idx);
-    return g;
-  }
-  {
-    // Asphalt with skirts (they hide gaps on cross-slopes) …
-    const ASPHALT = [0.05, 0.052, 0.056, 1];
-    const asphalt = strip([[-1, -4], [-1, 0], [1, 0], [1, -4]], ROAD_LIFT, () => ASPHALT);
-    asphalt.computeVertexNormals();
-    scene.add(new THREE.Mesh(asphalt, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-    // … a glowing centre line coloured by grade (it blooms) …
-    const line = new THREE.Mesh(strip([[-0.22, 0], [0.22, 0]], ROAD_LIFT + 0.05, d => [...gradeRGB(d).map(v => v * 1.5), 1]),
-      new THREE.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    scene.add(line);
-    // … and a warm halo on the ground either side, so the route reads from the helicopter.
-    const halo = new THREE.Mesh(strip([[-2.8, 0], [-1, 0], [1, 0], [2.8, 0]], ROAD_LIFT + 0.1, (d, j) => [1, 0.72, 0.42, j === 1 || j === 2 ? 0.09 : 0]),
-      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
-    halo.renderOrder = 1;
-    scene.add(halo);
-    // A 1 px line keeps the road visible from the far overview.
-    const lineGeom = new THREE.BufferGeometry().setFromPoints(roadPts.map(q => q.clone().setY(q.y + 0.6)));
-    lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(roadPts.flatMap((_, i) => gradeRGB(i / (roadPts.length - 1) * len).map(v => v * 1.6)), 3));
-    scene.add(new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ vertexColors: true, fog: false })));
-  }
+  const road = buildRoad({ scene, roadPoint, roadDir, elevation, len, STEP, ROAD_LIFT, ROAD_RADIUS, gradeRGB, roadPts });
   scene.add(arch(0, 'START · CAIMARI', '#ffffff'), arch(len, 'FINISH · COLL DE SA BATALLA', '#ffd34d'));
 
   function arch(d, text, accent) {
@@ -713,7 +688,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
       r.beam.visible = !(rig.mode === 'pov' && i === rig.selected);
 
       const half = Math.max(0.9, Math.min(9, camDist * 0.002)), trailKey = `${d}:${half.toFixed(1)}`;
-      r.trail.material.opacity = sel ? 1 : 0.45;
+      // close up the trail would read as glowing paint on real asphalt: it fades in with distance
+      r.trail.material.opacity = (sel ? 1 : 0.45) * Math.min(1, Math.max(0.12, (camDist - 60) / 450));
       if (r.trailKey === trailKey) return; // trail only rebuilds when the rider or the zoom moved
       r.trailKey = trailKey;
       const pos = r.trail.geometry.attributes.position;
@@ -760,6 +736,9 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
     sea.position.set(camera.position.x, 0, camera.position.z);
+    if (corridor.update(camera.position, riders[rig.selected].pos, now) || sceneDirty) { lastKey = ''; sceneDirty = false; }
+    trees?.update(camera);
+    road.update(camera.position.distanceTo(riders[rig.selected].pos));
     if (camera.position.distanceTo(flag.cloth.position) < 3000) waveFlag(t);
     for (const b of kmBoards) {
       const d = camera.position.distanceTo(b.position);

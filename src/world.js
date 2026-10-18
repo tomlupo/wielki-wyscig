@@ -643,6 +643,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   let lastNow = performance.now(), slowFrames = 0, frames = 0, w = 1, h = 1, insetRight = 0, lastKey = '';
   const post = createPost(renderer, scene, camera, { quality: lite ? 'low' : 'high' });
   const sunAway = new THREE.Vector2(-SUN_DIR.x, -SUN_DIR.z).normalize();
+  // Offline rendering (src/reel): a scripted camera instead of the rig, at a quality that never steps down.
+  let directCamera = null, holdQuality = false;
 
   // A right-hand panel (desktop) covers part of the canvas: shift the centre of
   // projection so the subject sits in the middle of the visible area.
@@ -671,7 +673,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     // Adaptive quality: if the phone cannot hold ~45 fps, drop the bloom first, then the pixel ratio.
     frames++;
     if (realDt > 0.024) slowFrames++;
-    if (frames === 30) {
+    if (frames === 30 && !holdQuality) {
       if (slowFrames > 15 && !post.lower() && dpr > 0.75) { dpr = Math.max(0.75, dpr - (slowFrames > 25 ? 0.5 : 0.25)); renderer.setPixelRatio(dpr); resize(); }
       frames = slowFrames = 0;
     }
@@ -748,6 +750,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     fov += (fovTarget - fov) * Math.min(1, realDt * (rig.dolly ? 1.2 : 2.5));
     if (Math.abs(camera.fov - fov * (aspect < 0.8 ? 1.3 : 1)) > 0.01) applyFov();
     camPos.y = Math.max(camPos.y, elevation(camPos.x, camPos.z) + (rig.mode === 'pov' ? 6 : 14));
+    if (directCamera) { const c = directCamera(now); camPos.copy(c.pos); camLook.copy(c.look); if (c.fov !== fov) { fov = fovTarget = c.fov; applyFov(); } }
     camera.position.copy(camPos);
     camera.lookAt(camLook);
     camera.updateMatrixWorld();
@@ -803,5 +806,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     onModeChange(fn) { onModeChange = fn; },
     onUserCamera(fn) { onUserCamera = fn; },
     setInsetRight(px) { if (px !== insetRight) { insetRight = px; resize(); } },
+    // Offline rendering (src/reel): fn(now) → { pos, look, fov } each frame (null: back to the rig), and the scene to aim it.
+    setDirectCamera(fn) { directCamera = fn; }, holdQuality() { holdQuality = true; },
+    camera, roadPoint, roadDir, elevation, riderPosition: i => riders[i].pos,
   };
 }

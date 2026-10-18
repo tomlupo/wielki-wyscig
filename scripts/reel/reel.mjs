@@ -1,0 +1,79 @@
+// The whole highlight reel, one command:
+//
+//   npm run reel                     both formats, full quality → out/reel-9x16.mp4, out/reel-16x9.mp4
+//   npm run reel -- --preview        half resolution, fast (a rough cut)
+//   npm run reel -- --format 9x16    one format
+//   npm run reel -- --from 600 --to 900 --force   re-render a frame range
+//
+// Steps (each cached under out/reel): sync the clips to the race clock → beat-map the music →
+// plan the edit → extract the clip frames → render every frame in headless Chrome → mix the
+// audio → encode H.264/AAC.
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, writeFileSync, statSync } from 'node:fs';
+import { makePlan, loadInputs } from './plan.mjs';
+import { extractFrames } from './frames.mjs';
+import { renderPlan } from './render.mjs';
+import { buildAudio } from './audio.mjs';
+import { ROOT, OUT, WORK, MUSIC } from './paths.mjs';
+
+const args = process.argv.slice(2);
+const opt = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : null; };
+const flag = k => args.includes(`--${k}`);
+const preview = flag('preview');
+const formats = (opt('format') ?? 'both') === 'both' ? ['9x16', '16x9'] : [opt('format')];
+const log = (...m) => console.log(...m);
+const step = (title) => log(`\n▸ ${title}`);
+
+function sh(cmd, cmdArgs) {
+  const r = spawnSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: false });
+  if (r.status !== 0) throw new Error(`${cmd} ${cmdArgs.join(' ')} failed`);
+}
+function encode(framesDir, audio, out, { fps, preview }) {
+  return new Promise((resolve, reject) => {
+    const a = ['-hide_banner', '-loglevel', 'error', '-y', '-framerate', String(fps), '-i', `${framesDir}/%06d.jpg`, '-i', audio,
+      '-vf', 'scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p',
+      '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '22' : '15', '-profile:v', 'high', '-tune', 'film',
+      ...(preview ? [] : ['-maxrate', '40M', '-bufsize', '80M']),
+      '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+      '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-shortest', '-movflags', '+faststart', out];
+    const p = spawn('ffmpeg', a, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = ''; p.stderr.on('data', d => { err += d; });
+    p.on('close', c => c === 0 ? resolve(out) : reject(new Error(err.slice(-800))));
+  });
+}
+
+mkdirSync(WORK, { recursive: true });
+const t0 = Date.now();
+
+step('Sync the clips to the race clock');
+sh('uv', ['run', '--quiet', 'scripts/reel/sync.py']);
+
+step('Music');
+const tracks = existsSync(MUSIC) ? readdirSync(MUSIC).filter(f => /\.(mp3|wav|flac|m4a|ogg)$/i.test(f)) : [];
+if (tracks.length) {
+  const beats = `${WORK}/beats.json`;
+  if (!existsSync(beats) || statSync(beats).mtimeMs < statSync(`${MUSIC}/${tracks[0]}`).mtimeMs || flag('rebeat')) sh('uv', ['run', '--quiet', 'scripts/reel/beats.py', `${MUSIC}/${tracks[0]}`, '--out', beats]);
+  else log(`  beats for ${tracks[0]} are up to date`);
+} else log('  no track in data/music: cutting to a 120 BPM grid, no music in the mix');
+
+const inputs = loadInputs();
+for (const format of formats) {
+  const name = `${format}${preview ? '-preview' : ''}`;
+  step(`Plan ${name}`);
+  const plan = makePlan({ format, preview, inputs });
+  writeFileSync(`${WORK}/plan-${name}.json`, JSON.stringify(plan));
+  log(`  ${plan.frames} frames, ${(plan.frames / plan.fps).toFixed(1)} s, ${plan.shots.length} shots, ${plan.cues.length} graphics`);
+
+  step(`Clip frames ${name}`);
+  const n = await extractFrames(plan, { log });
+  if (!n) log('  all clip frames present');
+
+  step(`Render ${name}`);
+  const dir = await renderPlan(plan, { name, from: Number(opt('from') ?? 0), to: Number(opt('to') ?? plan.frames), force: flag('force'), log });
+
+  step(`Audio + encode ${name}`);
+  const wav = await buildAudio(plan, { out: `${WORK}/audio-${name}.wav`, log });
+  const mp4 = await encode(dir, wav, `${OUT}/reel-${name}.mp4`, { fps: plan.fps, preview });
+  log(`  → ${mp4.replace(ROOT + '/', '')}`);
+}
+log(`\nDone in ${((Date.now() - t0) / 60000).toFixed(1)} min.`);

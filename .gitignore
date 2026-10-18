@@ -4,3 +4,7 @@ dist/
 .env*
 !.env.example
 rides/
+# Highlight reel: phone footage and renders stay local (scripts/reel)
+data/videos/
+data/music/
+out/

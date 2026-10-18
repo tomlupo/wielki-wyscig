@@ -1,0 +1,281 @@
+{
+ "start": {
+  "epoch": 1792230510.37,
+  "utcOffset": "+0200"
+ },
+ "clips": [
+  {
+   "file": "IMG_5363.MOV",
+   "duration": 3.933333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792225277,
+   "d": 5947.1,
+   "offRoad": 17305.6,
+   "onClimb": false,
+   "raceT0": -5233.37,
+   "kind": "off-route"
+  },
+  {
+   "file": "IMG_5364.MOV",
+   "duration": 10.2367,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792225285,
+   "d": 5947.1,
+   "offRoad": 17251.7,
+   "onClimb": false,
+   "raceT0": -5225.37,
+   "kind": "off-route"
+  },
+  {
+   "file": "IMG_7771.MOV",
+   "duration": 12.165,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230434,
+   "d": 0,
+   "offRoad": 372.9,
+   "onClimb": false,
+   "raceT0": -76.37,
+   "kind": "off-route"
+  },
+  {
+   "file": "IMG_7772.MOV",
+   "duration": 8.1,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230499,
+   "d": 0,
+   "offRoad": 238.7,
+   "onClimb": false,
+   "raceT0": -11.37,
+   "kind": "off-route"
+  },
+  {
+   "file": "IMG_7774.MOV",
+   "duration": 16.603333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230712,
+   "d": 741.3,
+   "offRoad": 4.9,
+   "onClimb": true,
+   "raceT0": 201.63,
+   "kind": "riding"
+  },
+  {
+   "file": "IMG_7778.MOV",
+   "duration": 9.0317,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231109,
+   "d": 2535.3,
+   "offRoad": 0.7,
+   "onClimb": true,
+   "raceT0": 598.63,
+   "kind": "riding"
+  },
+  {
+   "file": "IMG_7782.MOV",
+   "duration": 22.25,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231469,
+   "d": 4167.4,
+   "offRoad": 3.2,
+   "onClimb": true,
+   "raceT0": 958.63,
+   "kind": "riding"
+  },
+  {
+   "file": "IMG_7786.MOV",
+   "duration": 6.9,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231826,
+   "d": 5999.9,
+   "offRoad": 7.4,
+   "onClimb": true,
+   "raceT0": 1315.63,
+   "kind": "outlier"
+  },
+  {
+   "file": "IMG_7787.MOV",
+   "duration": 18.266667,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231850,
+   "d": 6499.1,
+   "offRoad": 1,
+   "onClimb": true,
+   "raceT0": 1339.63,
+   "kind": "riding"
+  },
+  {
+   "file": "IMG_7789.MOV",
+   "duration": 14.035,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232043,
+   "d": 7429.3,
+   "offRoad": 0.8,
+   "onClimb": true,
+   "raceT0": 1532.63,
+   "kind": "riding"
+  },
+  {
+   "file": "IMG_7792.MOV",
+   "duration": 7.3,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232177,
+   "d": 7743.7,
+   "offRoad": 16.4,
+   "onClimb": true,
+   "raceT0": 1674.31,
+   "kind": "summit",
+   "sightings": [
+    {
+     "rider": "el-szczupak",
+     "at": 3,
+     "offsetFromStart": -7.7
+    }
+   ]
+  },
+  {
+   "file": "IMG_7793.MOV",
+   "duration": 22.438333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232308,
+   "d": 7701.7,
+   "offRoad": 0.4,
+   "onClimb": true,
+   "raceT0": 1796.06,
+   "kind": "summit",
+   "sightings": [
+    {
+     "rider": "krzys",
+     "at": 17.3,
+     "offsetFromStart": 1.6
+    }
+   ]
+  },
+  {
+   "file": "IMG_7794.MOV",
+   "duration": 18.273333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232374,
+   "d": 7690.6,
+   "offRoad": 1.1,
+   "onClimb": true,
+   "raceT0": 1855.88,
+   "kind": "summit",
+   "sightings": [
+    {
+     "rider": "el-lobo",
+     "at": 10.8,
+     "offsetFromStart": 7.8
+    }
+   ]
+  },
+  {
+   "file": "IMG_7795.MOV",
+   "duration": 6.868333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232484,
+   "d": 7690.6,
+   "offRoad": 1.1,
+   "onClimb": true,
+   "raceT0": 1974.14,
+   "kind": "summit",
+   "sightings": [
+    {
+     "rider": "karol",
+     "at": 0.8,
+     "offsetFromStart": 0
+    },
+    {
+     "rider": "rafi",
+     "at": 3,
+     "offsetFromStart": -1
+    }
+   ]
+  },
+  {
+   "file": "VMGY3907.MP4",
+   "duration": 3.314807,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": false,
+   "audio": true,
+   "utcOffset": null,
+   "epoch": 1792235056,
+   "d": null,
+   "offRoad": null,
+   "onClimb": false,
+   "raceT0": 4545.63,
+   "kind": "off-route"
+  }
+ ]
+}

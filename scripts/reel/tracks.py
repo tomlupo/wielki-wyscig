@@ -55,12 +55,12 @@ def main() -> None:
             print(f"{r['id']}: no {path.name}")
             continue
         rows = ftr.read_fit(path)
-        T, D, seg, on, total = ftr.climb(rows, terrain)
-        start = utc(seg[0]["t"])
+        T, D, seg, on, total = ftr.climb(rows, terrain)  # T: epoch seconds
+        start, end = ftr.line_times(
+            T, D, total
+        )  # start-line and summit crossings, epoch seconds
         ep = np.array([utc(x["t"]) for x in rows])
-        sel = [
-            x for x, e in zip(rows, ep) if start - PAD_S <= e <= start + T[-1] + PAD_S
-        ]
+        sel = [x for x, e in zip(rows, ep) if start - PAD_S <= e <= end + PAD_S]
         e = np.array([utc(x["t"]) for x in sel])
         P = ftr.project(sel, terrain)
         d, off = ftr.along_route(P, route)
@@ -75,7 +75,6 @@ def main() -> None:
                 return [None] * len(grid)
             return [round(float(x), 1) for x in np.interp(grid, e[ok], v[ok])]
 
-        finish = r["samples"][-1]["t"]
         import fitparse  # the whole day's totals, from the FIT session summary
 
         sess = next(
@@ -100,11 +99,9 @@ def main() -> None:
         out["riders"][r["id"]] = {
             "name": r["name"],
             "day": day,
-            "climbStart": round(start, 1),
-            "gpsDuration": round(float(T[-1]), 1),
-            "stretch": round(
-                finish / float(T[-1]), 5
-            ),  # race.json seconds per GPS second
+            "lineStart": round(start, 2),  # over the start line (epoch s)
+            "lineEnd": round(end, 2),  # over the top (epoch s)
+            "official": r.get("officialTime"),
             "onRoad": round(float(on), 3),
             "t0": float(grid[0]),
             "x": resample(P[:, 0]),
@@ -116,16 +113,30 @@ def main() -> None:
         }
         local = dt.datetime.fromtimestamp(start, dt.timezone(dt.timedelta(hours=2)))
         print(
-            f"{r['id']:<12} climb start {local:%H:%M:%S} (+02:00), {T[-1]:.0f} s on GPS -> {finish} s in race.json (x{finish / T[-1]:.3f}), {len(grid)} s of track"
+            f"{r['id']:<12} over the start line {local:%H:%M:%S} (+02:00), own time {end - start:.0f} s, {len(grid)} s of track"
         )
-    starts = [v["climbStart"] for v in out["riders"].values()]
-    if starts:
-        mid = float(np.median(starts))
-        out["climbStarts"] = {
-            "median": mid,
-            "spread": [round(min(starts) - mid, 1), round(max(starts) - mid, 1)],
-        }
-        print(f"climb starts: {out['climbStarts']['spread']} s around the median")
+    # The race clock, as scripts/fit_to_race.py --mass-start builds race.json: t=0 is the first rider over
+    # the start line (the gun); each rider tops out at official − clockOffset, their GPS clock nudged
+    # linearly from their own start-line crossing to land there. So a wall-clock second W is race time
+    # lineStart + (W − lineStart)·k − gun for that rider (k within a few tenths of a percent of 1).
+    if out["riders"]:
+        lead = float(race.get("clockOffset") or 0)
+        gun = min(v["lineStart"] for v in out["riders"].values())
+        for v in out["riders"].values():
+            result = (
+                v["official"]
+                if v["official"]
+                else round(v["lineEnd"] - v["lineStart"] + lead)
+            )
+            target = gun + result - lead
+            v["k"] = round(
+                (target - v["lineStart"]) / (v["lineEnd"] - v["lineStart"]), 6
+            )
+        out["gun"], out["clockOffset"] = round(gun, 2), lead
+        spread = max(v["lineStart"] for v in out["riders"].values()) - gun
+        print(
+            f"race clock: gun {dt.datetime.fromtimestamp(gun, dt.timezone(dt.timedelta(hours=2))):%H:%M:%S}, last rider over the line {spread:.1f} s later, shown times + {lead} s"
+        )
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, separators=(",", ":")))
 

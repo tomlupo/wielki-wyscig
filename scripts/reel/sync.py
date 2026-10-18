@@ -128,6 +128,7 @@ def along_route_3d(
 
 
 PASS_M = 40.0  # a rider whose track comes this close to the camera's GPS fix passes the camera
+FIX_M = 100.0  # a camera fix this far from where its sighted riders were (by their FIT) is stale
 
 
 def fit_passes(c: dict, tracks: dict, cam: np.ndarray) -> list[dict]:
@@ -264,6 +265,14 @@ def main() -> None:
     # Each one dates the start directly, S = T + at - t_r(d); the median of them wins over the vote,
     # and a clip with its own sightings keeps its own offset, so the data on screen matches the rider in it.
     log = json.loads(Path(args.clips).read_text()) if Path(args.clips).exists() else {}
+    for c in clips:  # who is in the picture, as confirmed (a group, or one rider), travels with the clip
+        c.update(
+            {
+                k: v
+                for k, v in log.get(c["file"], {}).items()
+                if k in ("what", "group", "rider")
+            }
+        )
     ids = [r["id"] for r in riders]
     seen = []
     for c in on:
@@ -280,17 +289,26 @@ def main() -> None:
             )
     S = float(np.median([s["start"] for s in seen])) if seen else S_auto
 
-    # With the riders' own FIT rides (tracks.py → tracks.json) the clock needs no inference: rider r's
-    # race.json time at wall time T is (T - climb start_r) x stretch_r, and their 1 Hz track shows who
-    # passed each camera. Then the vote and the sightings above are only the cross-check.
-    tracks = (
-        json.loads(Path(args.tracks).read_text())["riders"]
+    # With the riders' own FIT rides (tracks.py → tracks.json) the clock needs no inference: race.json
+    # is on one race clock (t=0 = the first rider over the start line), so rider r's race time at wall
+    # time T is lineStart_r + (T - lineStart_r)·k_r - gun, and their 1 Hz track shows who passed each
+    # camera. Then the vote and the sightings above are only the cross-check.
+    tj = (
+        json.loads(Path(args.tracks).read_text())
         if Path(args.tracks).exists()
         else None
     )
+    tracks = tj["riders"] if tj and "gun" in tj else None
 
     def race_t(rid: str, T: float) -> float:
-        return (T - tracks[rid]["climbStart"]) * tracks[rid]["stretch"]
+        tr = tracks[rid]
+        return tr["lineStart"] + (T - tr["lineStart"]) * tr["k"] - tj["gun"]
+
+    def fit_d(
+        rid: str, T: float
+    ) -> float:  # rider rid's road position at wall time T, by their FIT ride
+        tr = tracks[rid]
+        return float(np.interp(T - tr["t0"], np.arange(len(tr["d"])), tr["d"]))
 
     for c in clips:
         c["raceT0"] = None if c["epoch"] is None else round(c["epoch"] - S, 2)
@@ -307,6 +325,14 @@ def main() -> None:
             if tracks:
                 for s in mine:
                     s["t"] = race_t(s["rider"], c["epoch"] + s["at"])
+                # Where they were then, by their own FIT, is near the camera (a sighting can come a few
+                # seconds before the rider reaches it). A phone fix further off than FIX_M is stale (taken
+                # on the move): the FIT position stands in for it, and the phone's is kept as dPhone.
+                d_fit = float(
+                    np.median([fit_d(s["rider"], c["epoch"] + s["at"]) for s in mine])
+                )
+                if c["d"] is None or abs(d_fit - c["d"]) > FIX_M:
+                    c["dPhone"], c["d"] = c["d"], round(d_fit, 1)
             c["raceT0"] = round(float(np.median([s["t"] - s["at"] for s in mine])), 2)
             c["sightings"] = [
                 {k: s[k] for k in ("rider", "at")}
@@ -360,18 +386,12 @@ def main() -> None:
         "clips": clips,
     }
     if tracks:
-        starts = [tr["climbStart"] for tr in tracks.values()]
-        mid = float(np.median(starts))
+        last = max(tr["lineStart"] for tr in tracks.values())
         out["start"]["fit"] = {
-            "local": clock(mid, offset),
-            "epoch": round(mid, 1),
-            "spread": [
-                round(float(min(starts) - mid), 1),
-                round(float(max(starts) - mid), 1),
-            ],
-            "stretch": round(
-                float(np.median([tr["stretch"] for tr in tracks.values()])), 4
-            ),
+            "local": clock(tj["gun"], offset),
+            "epoch": tj["gun"],
+            "lastOverLine": round(last - tj["gun"], 1),
+            "clockOffset": tj["clockOffset"],
         }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=1))
@@ -379,7 +399,7 @@ def main() -> None:
     if tracks:
         f = out["start"]["fit"]
         print(
-            f"clock from the FIT rides: climb starts {f['local']} ({f['spread']} s), race.json clocks run x{f['stretch']} (official times)"
+            f"race clock from the FIT rides: gun {f['local']} (first rider over the line; the last {f['lastOverLine']} s later), shown times + {f['clockOffset']} s"
         )
     print(
         f"race start {out['start']['local']} from {len(seen)} sightings (spread {out['start']['spread']} s); "

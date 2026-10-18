@@ -77,6 +77,10 @@ export function createOverlay(ctx, { W, H, model }) {
   const vis = (e, inS, outS) => { const k = env(e, inS, outS); return Math.min(k.i, k.o); };
 
   const name = i => riders[i].name.toUpperCase();
+  // Every time on screen is on the official clock (race.json clockOffset: Strava's lead-in before the 3D road);
+  // a finish with no official time is GPS time + the lead-in, marked as an estimate.
+  const clockOf = t => formatClock(model.shown(t) + 1e-6);
+  const finishText = i => clockOf(riders[i].finish) + (model.estimated(i) ? ' EST' : '');
   // Gaps down the (held) order never shrink: two riders swapping places show the same gap until the swap holds.
   const gapTexts = t => {
     const order = model.orderAt(t), out = {};
@@ -85,7 +89,7 @@ export function createOverlay(ctx, { W, H, model }) {
       const fin = t >= riders[i].finish;
       const raw = fin ? riders[i].finish - riders[order[0]].finish : model.gapToLeader(i, t);
       floor = Math.max(floor, raw);
-      out[i] = k === 0 ? (fin ? formatClock(riders[i].finish) : 'LEADER') : formatGap(floor);
+      out[i] = k === 0 ? (fin ? finishText(i) : 'LEADER') : formatGap(floor);
     });
     return out;
   };
@@ -105,7 +109,7 @@ export function createOverlay(ctx, { W, H, model }) {
       panel(x, y + 44 * S, w1 + 210 * S, 92 * S, { r: 16 });
       const live = 0.55 + 0.45 * Math.sin(e.f / 30 * Math.PI * 1.6);
       ctx.beginPath(); ctx.arc(x + 30 * S, y + 90 * S, 9 * S, 0, Math.PI * 2); ctx.fillStyle = RED; ctx.globalAlpha = a * live; ctx.fill(); ctx.globalAlpha = a;
-      num(formatClock(Math.min(t, model.duration)), x + 54 * S, y + 113 * S, { px: 64 });
+      num(clockOf(Math.min(t, model.duration)), x + 54 * S, y + 113 * S, { px: 64 });
       const tx = x + 54 * S + w1 + 26 * S;
       ctx.fillStyle = LINE; ctx.fillRect(tx - 14 * S, y + 62 * S, 1.5 * S, 56 * S);
       num(togo.toFixed(1), tx, y + 100 * S, { px: 40 });
@@ -126,7 +130,7 @@ export function createOverlay(ctx, { W, H, model }) {
       panel(x, y, w, h, { accent: r.color });
       dot(x + 52 * S, y + 52 * S, 26 * S, r.color, r.letter);
       text(name(i), x + 94 * S, y + 52 * S, { px: 40, spacing: 0.03 });
-      const place = fin ? `FINISHED ${ORDINAL(rank).toUpperCase()} · ${formatClock(r.finish)}` : rank === 1 ? 'P1 · LEADING' : `P${rank} · ${gapTexts(t)[i]}`;
+      const place = fin ? `FINISHED ${ORDINAL(rank).toUpperCase()} · ${finishText(i)}` : rank === 1 ? 'P1 · LEADING' : `P${rank} · ${gapTexts(t)[i]}`;
       text(place, x + 94 * S, y + 84 * S, { w: 500, px: 28, color: DIM, spacing: 0.04 });
       num(((model.len - d) / 1000).toFixed(2), x + w - 28 * S, y + 62 * S, { px: 48, align: 'right' });
       text('KM TO GO', x + w - 28 * S, y + 86 * S, { w: 500, px: 18, color: DIM, align: 'right', spacing: 0.14 });
@@ -368,8 +372,8 @@ export function createOverlay(ctx, { W, H, model }) {
       const a = vis(e, 0.35, 0.3);
       if (a <= 0) return;
       const i = c.rider, r = riders[i], rank = model.byFinish.indexOf(i) + 1;
-      const gap = rank === 1 ? formatClock(r.finish) : formatGap(r.finish - riders[model.winner].finish);
-      const sub = c.sub ?? `${gap}  ·  ${formatClock(r.finish)}`;
+      const gap = rank === 1 ? finishText(i) : formatGap(r.finish - riders[model.winner].finish);
+      const sub = c.sub ?? `${gap}  ·  ${finishText(i)}`;
       const rankW = measure(String(rank), 700, 132), suf = ORDINAL(rank).slice(String(rank).length).toUpperCase();
       const nameW = measure(name(i), 700, 62, 0.01), subW = measure(sub, 600, 32, 0.04);
       const left = 34 * S + rankW + measure(suf, 700, 34) + 30 * S;
@@ -487,7 +491,7 @@ export function createOverlay(ctx, { W, H, model }) {
           for (const p of placed) if (Math.abs(p - ly) < 34 * S) ly = p + 34 * S;
           placed.push(ly);
           text(`${riders[i].name.toUpperCase()}`, rx + 22 * S, ly + 9 * S, { w: 600, px: 24, color: INK, alpha: la });
-          text(i === model.winner ? formatClock(riders[i].finish) : formatGap(riders[i].finish - win.finish), x + w - 22 * S, ly + 9 * S, { w: 600, px: 22, color: i === model.winner ? GOLD : DIM, alpha: la, align: 'right' });
+          text(i === model.winner ? finishText(i) : formatGap(riders[i].finish - win.finish), x + w - 22 * S, ly + 9 * S, { w: 600, px: 22, color: i === model.winner ? GOLD : DIM, alpha: la, align: 'right' });
         }
       }
       ctx.restore();
@@ -514,7 +518,7 @@ export function createOverlay(ctx, { W, H, model }) {
           const ta = clamp01((u - 0.6) / 0.4);
           text(String(rank + 1), px + 22 * S, top + (rank ? 70 : 92) * S, { px: rank ? 72 : 96, color: rank ? DIM : GOLD, alpha: ta });
           text(r.name.toUpperCase(), px + 22 * S, base - 64 * S, { px: 40, alpha: ta, spacing: 0.02 });
-          text(rank ? formatGap(r.finish - riders[model.winner].finish) : formatClock(r.finish), px + 22 * S, base - 22 * S, { w: 600, px: 32, color: rank ? DIM : GOLD, alpha: ta });
+          text(rank ? formatGap(r.finish - riders[model.winner].finish) : finishText(i), px + 22 * S, base - 22 * S, { w: 600, px: 32, color: rank ? DIM : GOLD, alpha: ta });
         }
       });
       // the rest
@@ -527,7 +531,7 @@ export function createOverlay(ctx, { W, H, model }) {
         num(String(k + 4), x + 30 * S, ry + rh * 0.68, { px: 34, color: DIM, align: 'right' });
         dot(x + 72 * S, ry + rh / 2, 20 * S, r.color, r.letter);
         text(r.name.toUpperCase(), x + 108 * S, ry + rh * 0.68, { w: 600, px: 34 });
-        num(formatClock(r.finish), x + w - 170 * S, ry + rh * 0.68, { w: 600, px: 32, align: 'right' });
+        num(finishText(i), x + w - 170 * S, ry + rh * 0.68, { w: 600, px: 32, align: 'right' });
         text(formatGap(r.finish - riders[model.winner].finish), x + w, ry + rh * 0.68, { w: 600, px: 32, color: DIM, align: 'right' });
         ctx.restore();
         ry += rh;

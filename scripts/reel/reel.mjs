@@ -1,8 +1,8 @@
 // The whole highlight reel, one command:
 //
-//   npm run reel                     both formats, full quality → out/reel-9x16.mp4, out/reel-16x9.mp4
+//   npm run reel                     the phone reel (9:16), full quality → out/reel-9x16.mp4
 //   npm run reel -- --preview        half resolution, fast (a rough cut)
-//   npm run reel -- --format 9x16    one format
+//   npm run reel -- --format 16x9    the landscape cut instead (--format both: the two)
 //   npm run reel -- --from 600 --to 900 --force   re-render a frame range
 //
 // Steps (each cached under out/reel): sync the clips to the race clock → beat-map the music →
@@ -20,7 +20,8 @@ const args = process.argv.slice(2);
 const opt = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : null; };
 const flag = k => args.includes(`--${k}`);
 const preview = flag('preview');
-const formats = (opt('format') ?? 'both') === 'both' ? ['9x16', '16x9'] : [opt('format')];
+const format = opt('format') ?? '9x16';
+const formats = format === 'both' ? ['9x16', '16x9'] : [format];
 const log = (...m) => console.log(...m);
 const step = (title) => log(`\n▸ ${title}`);
 

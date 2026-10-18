@@ -49,6 +49,17 @@ for (const format of ['9x16', '16x9']) {
     }
   });
 
+  test(`${format}: data over a phone clip is about a rider confirmed in that clip`, () => {
+    for (const c of plan.cues) {
+      const shot = plan.shots.find(s => s.id === c.seg);
+      const who = [c.rider, ...(c.riders ?? [])].filter(i => i != null);
+      if (shot?.kind !== 'clip' || !who.length) continue;
+      const clip = sync.clips.find(x => x.file === shot.clip);
+      const seen = new Set([...(clip.sightings ?? []).map(s => s.rider), ...(clip.group ?? []), ...(clip.rider ? [clip.rider] : [])]);
+      for (const i of who) assert.ok(seen.has(model.riders[i].id), `${c.type} on ${shot.id} is about ${model.riders[i].name}, who is not in ${shot.clip}`);
+    }
+  });
+
   test(`${format}: a caption that names a place holds for its whole time on screen`, () => {
     for (const c of plan.cues.filter(c => 'claimsHeld' in c)) {
       if (!c.claimsHeld) continue;

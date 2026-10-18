@@ -81,6 +81,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     const s = x.s, n = x.to - x.from, offset = x.from - x.start;
     const shot = { id: s.id, kind: s.kind, from: x.from, to: x.to, start: x.start, end: x.end, enter: s.enter?.type ?? null, focus: s.focus ?? null, labels: s.labels ?? 'all' };
     if (s.dim) shot.dim = s.dim;
+    if (s.sfx) shot.sfx = s.sfx;
     if (s.kind === '3d') {
       const t = mapFrames({ n, fps, ramp: s.time.speed, anchor: { value: s.time.t, at: s.time.at ?? 0 }, offset });
       shot.t = t.map(v => +Math.max(0, Math.min(model.duration, v)).toFixed(3));

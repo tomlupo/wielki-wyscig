@@ -52,7 +52,11 @@ export function buildModel(race, route) {
     for (let t = t0; t <= t1; t += 0.5) if (orderAt(t)[rank] !== rider) return false;
     return orderAt(t1)[rank] === rider;
   }
-  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, holdsRank };
+  // The official clock (DATA.md, Clock): race time + clockOffset, Strava's lead-in before the 3D road.
+  const clockOffset = race.clockOffset ?? 0;
+  const shown = t => t + clockOffset;
+  const estimated = i => race.riders[i].officialTime == null && race.riders.some(r => r.officialTime != null);
+  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, holdsRank, clockOffset, shown, estimated };
 }
 
 export const ORDINAL = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th');

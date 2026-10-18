@@ -111,10 +111,11 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     const movers = [...new Set(shown.map(e => e.rider))], passed = [...new Set(shown.map(e => e.other))];
     seg({ id: 'gun', kind: '3d', dur, focus: early[0].rider, labels: 'names', enter: { type: 'whip', frames: 10 },
       time: { t: t0, speed }, cam: { type: 'chase', rider: early[0].rider, group: true, reach: 120, dist: 95, phi: 1.2, ahead: 25, fov: 34, swing: 'auto' },
-      callouts: shown.flatMap(e => [
-        { rider: e.rider, text: `↑ ${ordinal(e.rank).toUpperCase()}`, color: GREEN, at: at(e.t), dur: 'end' },
-        { rider: e.other, text: '↓', color: RED, at: at(e.t), dur: 1.2 },
-      ]),
+      callouts: [
+        ...shown.map(e => ({ rider: e.rider, text: `↑ ${ordinal(e.rank).toUpperCase()}`, color: GREEN, at: at(e.t), dur: 'end' })),
+        // one ↓ per rider passed, from the first time
+        ...passed.map(i => ({ rider: i, text: '↓', color: RED, at: at(shown.find(e => e.other === i).t), dur: 'end' })),
+      ],
       cues: [{ type: 'event', at: 0.3, dur: dur - 0.5, kicker: `KM ${km(model.distance(early[0].rider, early[0].t))} · ${clock(early[0].t)}`,
         head: `${movers.map(name).join(' and ')} move up`, sub: `past ${passed.map(name).join(' and ')}, into ${shown.map(e => ordinal(e.rank)).join(' and ')}` }] });
   }
@@ -151,7 +152,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     time: { t: tAttack, at: 0.6, speed: [[0, 0.6], [1.4, 0.5], [2.4, 7], [3.8, 7]] }, cam: { type: 'side', rider: attacker, dist: 90, fov: 26, ahead: 0, sign: -1, drift: 0.12, push: -0.03 },
     callouts: [{ rider: attacker, text: 'ATTACK', color: RED, at: 0, dur: 'end', blinkFor: 2.4 }],
     cues: [
-      { type: 'alert', at: 0.0, dur: 1.9, text: 'ATTACK', y: 0.3, sub: attackPower ? `${name(attacker)} · ${Math.round(attackPower.w)} W for 30 s` : name(attacker) },
+      { type: 'alert', at: 0.0, dur: 1.9, text: 'ATTACK', y: 0.25, sub: attackPower ? `${name(attacker)} · ${Math.round(attackPower.w)} W for 30 s` : name(attacker) },
       ...(attackPower ? [{ type: 'trace', at: 1.2, dur: 'end', rider: attacker, metric: 'watts', window: [tAttack - 50, tAttack + 40], band: [attackPower.t, attackPower.t + 30], bandLabel: `${Math.round(attackPower.w)} W · 30 S` }] : []),
     ] });
   // Away: the lead counting up on the race clock, from ahead of the road.

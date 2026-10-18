@@ -1,10 +1,10 @@
 [
-  { "id": "all-seven", "src": "/media/all-seven.mp4", "poster": "/media/all-seven.jpg", "riderId": "el-halcon", "d": 741, "caption": "All seven together" },
-  { "id": "front-three", "src": "/media/front-three.mp4", "poster": "/media/front-three.jpg", "riderId": "los-locos", "d": 2535, "caption": "The front three" },
-  { "id": "three-up-front", "src": "/media/three-up-front.mp4", "poster": "/media/three-up-front.jpg", "riderId": "los-locos", "d": 4167, "caption": "Still three up front" },
-  { "id": "halcon-locos-wheel", "src": "/media/halcon-locos-wheel.mp4", "poster": "/media/halcon-locos-wheel.jpg", "riderId": "el-halcon", "d": 6499, "caption": "El Halcon leads, Los Locos on his wheel" },
-  { "id": "halcon-leads", "src": "/media/halcon-leads.mp4", "poster": "/media/halcon-leads.jpg", "riderId": "el-halcon", "d": 7429, "caption": "El Halcon leads, Los Locos chasing" },
-  { "id": "krzys-tops-out", "src": "/media/krzys-tops-out.mp4", "poster": "/media/krzys-tops-out.jpg", "riderId": "krzys", "d": 7702, "caption": "Krzys tops out" },
-  { "id": "el-lobo", "src": "/media/el-lobo.mp4", "poster": "/media/el-lobo.jpg", "riderId": "el-lobo", "d": 7691, "caption": "El Lobo, 66 s later" },
-  { "id": "rafi-karol", "src": "/media/rafi-karol.mp4", "poster": "/media/rafi-karol.jpg", "riderId": "rafi", "d": 7691, "caption": "Rafi and Karol, 2 s apart" }
+  { "id": "all-seven", "src": "/media/all-seven.mp4", "poster": "/media/all-seven.jpg", "riderId": "el-halcon", "d": 898, "caption": "All seven together" },
+  { "id": "front-three", "src": "/media/front-three.mp4", "poster": "/media/front-three.jpg", "riderId": "los-locos", "d": 2692, "caption": "The front three" },
+  { "id": "three-up-front", "src": "/media/three-up-front.mp4", "poster": "/media/three-up-front.jpg", "riderId": "los-locos", "d": 4324, "caption": "Still three up front" },
+  { "id": "halcon-locos-wheel", "src": "/media/halcon-locos-wheel.mp4", "poster": "/media/halcon-locos-wheel.jpg", "riderId": "el-halcon", "d": 6656, "caption": "El Halcon leads, Los Locos on his wheel" },
+  { "id": "halcon-leads", "src": "/media/halcon-leads.mp4", "poster": "/media/halcon-leads.jpg", "riderId": "el-halcon", "d": 7586, "caption": "El Halcon leads, Los Locos chasing" },
+  { "id": "krzys-tops-out", "src": "/media/krzys-tops-out.mp4", "poster": "/media/krzys-tops-out.jpg", "riderId": "krzys", "d": 7859, "caption": "Krzys tops out" },
+  { "id": "el-lobo", "src": "/media/el-lobo.mp4", "poster": "/media/el-lobo.jpg", "riderId": "el-lobo", "d": 7848, "caption": "El Lobo, 66 s later" },
+  { "id": "rafi-karol", "src": "/media/rafi-karol.mp4", "poster": "/media/rafi-karol.jpg", "riderId": "rafi", "d": 7848, "caption": "Rafi and Karol, 2 s apart" }
 ]

@@ -51,7 +51,10 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   scene.add(ground);
   await breathe();
   const sky = createSky(), sea = createSea();
-  scene.add(sky, sea, createFarLand({ width, depth, elevation }));
+  let farLand = createFarLand({ width, depth, elevation });
+  scene.add(sky, sea, farLand);
+  // The measured island (public/horizon.json) replaces the sketched one when it arrives; it is optional.
+  const horizonData = fetch('/horizon.json').then(r => r.ok ? r.json() : null).catch(() => null);
   scene.add(new THREE.HemisphereLight(0xc2d6ff, 0x6a5038, 1.7));
   const sun = new THREE.DirectionalLight(SUN_COLOR, 5.2);
   sun.position.copy(SUN_DIR).multiplyScalar(9000);
@@ -792,6 +795,13 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   // First frame: set the camera onto the overview so the first paint is not black.
   orbitPosition(rig.orbit, camPos); camLook.copy(rig.orbit.target);
   textureReady.then(() => { lastKey = ''; });
+  horizonData.then(horizon => {
+    if (!horizon) return;
+    const measured = createFarLand({ width, depth, elevation, horizon });
+    scene.remove(farLand); farLand.geometry.dispose(); farLand.material.dispose();
+    scene.add(farLand = measured);
+    lastKey = '';
+  });
 
   return {
     frame, setMode, setShot, startIntro, skipIntro, addPin,

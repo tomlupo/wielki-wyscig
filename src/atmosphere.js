@@ -112,11 +112,26 @@ export function createSea() {
   return sea;
 }
 
-// The island beyond the survey: the survey's own edge heights carried outward into a
+// Real heights around the survey, from public/horizon.json (scripts/build_horizon.py:
+// AWS Terrain Tiles, a square grid in the survey's frame, sea below 0). Bilinear; null outside it.
+function horizonSampler({ n, size, heights }) {
+  const bytes = Uint8Array.from(atob(heights), c => c.charCodeAt(0)), h = new Int16Array(bytes.buffer);
+  return (x, z) => {
+    const u = (x / size + 0.5) * (n - 1), v = (z / size + 0.5) * (n - 1);
+    if (u < 0 || v < 0 || u >= n - 1 || v >= n - 1) return null;
+    const a = Math.floor(u), b = Math.floor(v), fx = u - a, fy = v - b, o = b * n + a;
+    return (h[o] * (1 - fx) + h[o + 1] * fx) * (1 - fy) + (h[o + n] * (1 - fx) + h[o + n + 1] * fx) * fy;
+  };
+}
+
+// The island beyond the survey. With `horizon` (the real grid): the Serra de Tramuntana,
+// the plain and the coast as they are, the sea where the ground is below 0. Without it
+// (still loading, or missing): the survey's own edge heights carried outward into a
 // coarse Tramuntana ridge (it runs SW–NE behind the climb), the sea past it to the NW
 // and the plain to the SE. Low detail on purpose; the haze does the rest.
-export function createFarLand({ width, depth, elevation }) {
+export function createFarLand({ width, depth, elevation, horizon = null }) {
   const N = 112, SPAN = 52000, hw = width / 2, hd = depth / 2;
+  const real = horizon ? horizonSampler(horizon) : null;
   const g = new THREE.PlaneGeometry(1, 1, N, N).rotateX(-Math.PI / 2);
   const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
   const warp = s => Math.sign(s) * Math.abs(s) ** 1.9; // dense near the survey, sparse far away
@@ -125,8 +140,14 @@ export function createFarLand({ width, depth, elevation }) {
     const cx = Math.max(-hw, Math.min(hw, x)), cz = Math.max(-hd, Math.min(hd, z));
     const out = Math.hypot(x - cx, z - cz);
     let y;
+    const measured = real && out >= 1 ? real(x, z) : null;
     if (out < 1) y = elevation(x, z) - 60; // under the survey mesh
-    else {
+    else if (measured !== null) {
+      // The grid agrees with the survey DEM to a few metres, so a 600 m blend hides the seam.
+      const blend = Math.min(1, out / 600), e = blend * blend * (3 - 2 * blend);
+      y = elevation(cx, cz) * (1 - e) + measured * e - 4 * (1 - e);
+      if (measured <= 0 && e > 0.99) y = -25; // the sea covers it
+    } else {
       const s = (-x - z) / Math.SQRT2, t = (x - z) / Math.SQRT2; // s: towards NW (the coast), t: along the range
       const ridge = s < 3500 ? 120 + 880 * Math.exp(-(((s - 3500) / 3000) ** 2)) : 1000 * Math.exp(-(((s - 3500) / 2300) ** 2)) - 260 * Math.min(1, Math.max(0, (s - 5500) / 3000));
       const rough = ridged(x / 2600 + 11, z / 2600 - 7) * 0.9 + 0.1;

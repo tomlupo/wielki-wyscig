@@ -4,12 +4,14 @@
 //   npm run reel -- --preview        half resolution, fast (a rough cut)
 //   npm run reel -- --format 16x9    the landscape cut instead (--format both: the two)
 //   npm run reel -- --from 600 --to 900 --force   re-render a frame range
+//   npm run reel -- --music <file> [--rebeat]     cut to another track in data/music (--rebeat: map its beats again)
 //
 // Steps (each cached under out/reel): sync the clips to the race clock → beat-map the music →
 // plan the edit → extract the clip frames → render every frame in headless Chrome → mix the
 // audio → encode H.264/AAC.
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { basename } from 'node:path';
 import { makePlan, loadInputs } from './plan.mjs';
 import { extractFrames } from './frames.mjs';
 import { renderPlan } from './render.mjs';
@@ -63,7 +65,9 @@ const tracks = existsSync(MUSIC) ? readdirSync(MUSIC).filter(f => /\.(mp3|wav|fl
 if (opt('music')) tracks.unshift(opt('music'));
 if (tracks.length) {
   const beats = `${WORK}/beats.json`;
-  if (!existsSync(beats) || statSync(beats).mtimeMs < statSync(`${MUSIC}/${tracks[0]}`).mtimeMs || flag('rebeat')) sh('uv', ['run', '--quiet', 'scripts/reel/beats.py', `${MUSIC}/${tracks[0]}`, '--out', beats]);
+  // beat-map again when the map is missing, is for another track, or is older than the track (or on --rebeat)
+  const mapped = existsSync(beats) ? JSON.parse(readFileSync(beats, 'utf8')) : null;
+  if (!mapped || mapped.file !== basename(tracks[0]) || statSync(beats).mtimeMs < statSync(`${MUSIC}/${tracks[0]}`).mtimeMs || flag('rebeat')) sh('uv', ['run', '--quiet', 'scripts/reel/beats.py', `${MUSIC}/${tracks[0]}`, '--out', beats]);
   else log(`  beats for ${tracks[0]} are up to date`);
 } else log('  no track in data/music: cutting to a 120 BPM grid, no music in the mix');
 

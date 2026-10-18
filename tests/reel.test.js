@@ -29,7 +29,7 @@ for (const format of ['9x16', '16x9']) {
   const plan = makePlan({ format, inputs: { model, sync, beats: track } });
 
   test(`${format}: every cut lands on a beat, the reel runs 60–90 s, shots butt up`, () => {
-    for (const s of plan.shots) {
+    for (const s of plan.shots.filter(s => !s.unsnapped)) { // a match cut keeps its own time
       const sec = s.start / plan.fps, nearest = Math.min(...beats.map(b => Math.abs(b - sec)));
       assert.ok(nearest <= 0.5 / plan.fps + 1e-9, `${s.id} starts ${nearest.toFixed(3)} s off the beat`);
     }
@@ -61,12 +61,13 @@ for (const format of ['9x16', '16x9']) {
   });
 
   test(`${format}: a caption that names a place holds for its whole time on screen`, () => {
-    for (const c of plan.cues.filter(c => 'claimsHeld' in c)) {
-      if (!c.claimsHeld) continue;
+    for (const c of plan.cues.filter(c => c.claimsHeld)) {
       const ts = plan.raceT.slice(c.from, c.to).filter(v => v != null);
-      // "X leads" means X is first in the held order at every moment the caption is up
-      assert.ok(ts.every(t => model.orderAt(t)[0] === c.rider), `"${c.sub}" is not true all the way through`);
+      // "X leads" means X holds that place in the held order at every moment the caption is up
+      for (const k of c.claims) assert.ok(ts.every(t => model.orderAt(t)[k.rank] === k.rider), `"${c.head} / ${c.sub}" is not true all the way through`);
     }
+    // and a pass names no place at all: its pills are arrows, its words relational
+    for (const s of plan.shots) for (const k of s.callouts ?? []) assert.ok(!/\d/.test(k.text), `${s.id}: "${k.text}" names a place`);
   });
 }
 

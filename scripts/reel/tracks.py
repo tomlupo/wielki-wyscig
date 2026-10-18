@@ -6,12 +6,12 @@
 
     uv run scripts/reel/tracks.py [--rides rides] [--out out/reel/tracks.json]
 
-race.json keeps only the climb, on each rider's own clock (t from their start, stretched
-to the official segment time). The FIT files keep the wall clock, so here each rider gets:
-the UTC second they started the climb (the same cut as scripts/fit_to_race.py, imported),
-the stretch from GPS seconds to race.json seconds, and a 1 Hz track around the climb:
-position in the terrain frame, road distance, heart rate, power. The clip sync reads it to
-see exactly who passed each camera, and when.
+race.json keeps only the climb, on one race clock (DATA.md, Clock). The FIT files keep the
+wall clock, so here each rider gets the UTC seconds they crossed the start line and the top
+(the same cut as scripts/fit_to_race.py, imported), the k that maps their GPS seconds onto
+the race clock, and a 1 Hz track around the climb: position in the terrain frame and road
+distance. The clip sync reads it to see exactly who passed each camera, and when. Nothing
+else of the ride (its route away from the climb, its totals) leaves the FIT file.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def main() -> None:
         sel = [x for x, e in zip(rows, ep) if start - PAD_S <= e <= end + PAD_S]
         e = np.array([utc(x["t"]) for x in sel])
         P = ftr.project(sel, terrain)
-        d, off = ftr.along_route(P, route)
+        d, _ = ftr.along_route(P, route)
         grid = np.arange(
             np.ceil(e[0]), np.floor(e[-1]) + 1
         )  # 1 Hz on the wall clock (smart recording skips seconds)
@@ -75,30 +75,8 @@ def main() -> None:
                 return [None] * len(grid)
             return [round(float(x), 1) for x in np.interp(grid, e[ok], v[ok])]
 
-        import fitparse  # the whole day's totals, from the FIT session summary
-
-        sess = next(
-            (
-                m.get_values()
-                for m in fitparse.FitFile(str(path)).get_messages("session")
-            ),
-            {},
-        )
-        day = {
-            k: sess.get(f)
-            for k, f in (
-                ("km", "total_distance"),
-                ("ascent", "total_ascent"),
-                ("hours", "total_elapsed_time"),
-                ("avgHr", "avg_heart_rate"),
-                ("avgW", "avg_power"),
-            )
-        }
-        day["km"] = round(day["km"] / 1000, 1) if day["km"] else None
-        day["hours"] = round(day["hours"] / 3600, 2) if day["hours"] else None
         out["riders"][r["id"]] = {
             "name": r["name"],
-            "day": day,
             "lineStart": round(start, 2),  # over the start line (epoch s)
             "lineEnd": round(end, 2),  # over the top (epoch s)
             "official": r.get("officialTime"),
@@ -107,9 +85,6 @@ def main() -> None:
             "x": resample(P[:, 0]),
             "z": resample(P[:, 1]),
             "d": resample(d),
-            "off": resample(off),
-            "hr": resample([x["hr"] for x in sel]),
-            "w": resample([x["w"] for x in sel]),
         }
         local = dt.datetime.fromtimestamp(start, dt.timezone(dt.timedelta(hours=2)))
         print(

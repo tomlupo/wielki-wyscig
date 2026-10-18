@@ -2,7 +2,7 @@
 // at one frame (race time, every rider's road distance) and of the time into the shot, so
 // any frame can be rendered on its own and a re-render is identical.
 //
-// World axes (world.js): x east, z south, y up, metres; riders drawn 5× life size.
+// World axes (world.js): x east, z south, y up, metres; riders drawn 3× life size (RIDER_SCALE).
 import * as THREE from 'three';
 
 const UP = new THREE.Vector3(0, 1, 0);

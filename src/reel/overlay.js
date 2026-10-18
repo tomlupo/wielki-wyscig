@@ -522,7 +522,7 @@ export function createOverlay(ctx, { W, H, model, beatPhase = f => (f / 15) % 1 
       ctx.beginPath(); ctx.moveTo(lx, Y(0)); ctx.lineTo(rx, Y(0)); ctx.stroke(); ctx.setLineDash([]);
       for (let k = 1; k * 1000 < len; k++) text(String(k), X(k * 1000), bot + 34 * S, { w: 600, px: 19, color: FAINT, align: 'center' });
       text('KM', rx, bot + 34 * S, { w: 600, px: 19, color: FAINT, align: 'right' });
-      const draw = easeInOut(clamp01((e.since - 0.3) / 2.2)); // lines grow up the climb
+      const draw = easeInOut(clamp01((e.since - 0.3) / 1.2)); // lines grow up the climb, quick enough to leave time to read
       const upto = Math.max(1, Math.round(draw * N));
       const order = model.byFinish.slice().reverse();
       for (const i of order) {
@@ -536,7 +536,7 @@ export function createOverlay(ctx, { W, H, model, beatPhase = f => (f / 15) % 1 
       }
       // labels at the right edge once drawn
       if (draw > 0.97) {
-        const la = clamp01((e.since - 2.5) / 0.4);
+        const la = clamp01((e.since - 1.5) / 0.3);
         const placed = [];
         for (const i of model.byFinish) {
           let ly = Y(lines[i][N]);

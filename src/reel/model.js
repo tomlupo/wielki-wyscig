@@ -48,6 +48,20 @@ export function buildModel(race, route) {
     const d = distance(i, t);
     return Math.max(0, timeAtDistance(riders[i].samples, d) - timeAtDistance(riders[lead].samples, d));
   }
+  // A rider's numbers over a race-time window: the average, the peak sample, and the strongest 30 s of power.
+  const inWindow = (i, key, t0 = 0, t1 = Infinity) => riders[i].samples.filter(x => x[key] != null && x.t >= t0 && x.t <= t1);
+  const avg = (i, key, t0, t1) => { const x = inWindow(i, key, t0, t1); return x.length ? x.reduce((s, p) => s + p[key], 0) / x.length : null; };
+  const peak = (i, key, t0, t1) => inWindow(i, key, t0, t1).reduce((m, x) => !m || x[key] > m[key] ? x : m, null);
+  function best30(i) {
+    const s = inWindow(i, 'watts');
+    let best = null;
+    for (let a = 0; a < s.length; a++) {
+      let sum = 0, n = 0;
+      for (let b = a; b < s.length && s[b].t - s[a].t <= 30; b++) { sum += s[b].watts; n++; }
+      if (n > 3 && (!best || sum / n > best.w)) best = { w: sum / n, t: s[a].t };
+    }
+    return best;
+  }
   // How long ago rider a was where rider b is now (a's lead over b at the same road point; negative if b is ahead).
   const gapBetween = (a, b, t) => t - timeAtDistance(riders[a].samples, distance(b, t));
   // Does `rider` hold `rank` (0-based) for the whole race-time window [t0, t1]? Captions use this.
@@ -59,7 +73,7 @@ export function buildModel(race, route) {
   const clockOffset = race.clockOffset ?? 0;
   const shown = t => t + clockOffset;
   const estimated = i => race.riders[i].officialTime == null && race.riders.some(r => r.officialTime != null);
-  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, gapBetween, holdsRank, clockOffset, shown, estimated };
+  return { race, route, riders, duration, len, summitD: summit[3], events, stats, profile, winner, byFinish, position, distance, orderAt, gapToLeader, gapBetween, holdsRank, clockOffset, shown, estimated, avg, peak, best30 };
 }
 
 export const ORDINAL = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th');

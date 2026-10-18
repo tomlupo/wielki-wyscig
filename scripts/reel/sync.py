@@ -6,26 +6,27 @@
 
     uv run scripts/reel/sync.py [--videos data/videos] [--out out/reel/sync.json]
 
-race.json has no wall clock: `t` counts from each rider's entry into the segment.
-The clips have one (QuickTime creation_time, UTC) and a GPS fix
-(com.apple.quicktime.location.ISO6709). This script:
+race.json counts `t` on one race clock (DATA.md, Clock: t = 0 when the first rider
+crosses the start line). The clips carry a wall clock (QuickTime creation_time, UTC)
+and a GPS fix (com.apple.quicktime.location.ISO6709). This script:
 
 1. projects each fix onto the reference road with the same projection and
-   map-matching as scripts/fit_to_race.py (imported, not copied): road distance
-   `d` and the fix's offset from the road;
-2. fits ONE absolute start time S for the race (everyone rolled out of Caimari
-   together, so race time t = wall time - S for every rider). A clip filmed at
-   road point d at wall time T is explained by rider r if T ≈ S + t_r(d). S is
-   the value that explains the most clips (a robust vote, not a mean), then
-   refined on the clips that agree with it;
-3. labels every clip: `riding` (the camera moves with the riders, its time fits
-   S within tolerance), `waiting` (the camera reached d BEFORE the riders it
-   films, e.g. stopped at the roadside: T is earlier than the first arrival),
-   `summit` (filmed at the top after the leaders finished), or `off-route`
-   (not on the climb: the morning roll-out, a café selfie).
+   map-matching as scripts/fit_to_race.py (imported, not copied), checked against
+   the fix's altitude: road distance `d` and the fix's offset from the road. The fix
+   itself is used here and not written out;
+2. puts the clips on the race clock. With the riders' FIT rides (tracks.py →
+   tracks.json) nothing is inferred: rider r's race time at wall time T is
+   lineStart_r + (T - lineStart_r)·k_r - gun, and a clip runs on the clock of the
+   rider seen in it (clips.json sightings), so the data over it is that rider's at
+   that second. Without FIT rides it fits one start time S, the value that explains
+   the most clips (a robust vote, not a mean), refined by the riders identified in
+   the editor's log;
+3. labels every clip: `riding` (its time fits a rider passing its road point),
+   `waiting` (the camera reached d before the riders it films), `summit` (filmed at
+   the top after the first finisher), or `off-route` (not on the climb: the morning
+   roll-out, a café selfie).
 
-For each clip it writes the race time at the clip's first frame, `raceT0`, so the
-reel can show live data over it and fly the 3D camera to exactly `d`.
+For each clip it writes `raceT0`, the race time at its first frame, and who is in it.
 """
 
 from __future__ import annotations
@@ -228,6 +229,10 @@ def main() -> None:
     # clips it explains (some rider within TOL_S of the clip time; a clip at the summit is explained when
     # it comes after the first finisher). The best-supported S wins; ties go to the smaller total residual.
     on = [c for c in clips if c["onClimb"]]
+    if not on:
+        raise SystemExit(
+            "no clip has a GPS fix on the climb: nothing to put on the race clock"
+        )
     arrivals = {
         c["file"]: np.array([time_at_distance(r["samples"], c["d"]) for r in riders])
         for c in on
@@ -370,6 +375,10 @@ def main() -> None:
             c["kind"] = "outlier"
 
     spread = [s["start"] - S for s in seen]
+    for c in (
+        clips
+    ):  # where the phone was is personal data: d and offRoad say all the reel needs
+        c.pop("gps", None)
     out = {
         "start": {
             "epoch": round(S, 2),

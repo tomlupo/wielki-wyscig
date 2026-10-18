@@ -89,11 +89,8 @@ async function boot() {
     }
     return cameras.pose(spec, camCtx(shot, f));
   }
-  let lastInset = 0;
   async function render3d(shot, f, layer) {
     const c = camCtx(shot, f), pose = poseOf(shot, f);
-    const inset = shot.inset ?? 0;
-    if (inset !== lastInset) { world.setInsetRight(inset); lastInset = inset; }
     world.setDirectCamera(() => pose);
     if (shot.focus != null) world.select(shot.focus); // the road imagery and detail load around the shot's rider
     const next = shot.t[Math.min(shot.t.length - 1, f - shot.from + 1)];
@@ -197,19 +194,6 @@ async function boot() {
     for (let k = 1; k <= 6; k++) if (f + k < shot.to) { const n = clipFrames(shot, f + k); image(frameUrl(shot, n.a)).catch(() => {}); }
     const k = f - shot.from, u = shot.to - shot.from > 1 ? k / (shot.to - shot.from - 1) : 0;
     const zoom = shot.zoom ? shot.zoom[0] + (shot.zoom[1] - shot.zoom[0]) * easeInOut(u) : 1;
-    if (shot.fit === 'panel') {
-      if (shot.cam) await render3d(shot, f, layer); else { g.fillStyle = '#0b0f0d'; g.fillRect(0, 0, W, H); }
-      const ph = H - 2 * shot.panel.margin, pw = ph * ia.width / ia.height, px = W - shot.panel.margin - pw, py = shot.panel.margin;
-      g.save();
-      g.shadowColor = 'rgba(0,0,0,0.55)'; g.shadowBlur = 40; g.shadowOffsetX = -8;
-      g.beginPath(); g.roundRect(px, py, pw, ph, 22); g.fillStyle = '#000'; g.fill();
-      g.shadowColor = 'transparent';
-      g.clip();
-      drawCover(g, ia, ib, mix, px, py, pw, ph, zoom, shot.focal);
-      g.restore();
-      g.lineWidth = 3; g.strokeStyle = 'rgba(255,211,77,0.9)'; g.beginPath(); g.roundRect(px, py, pw, ph, 22); g.stroke();
-      return;
-    }
     if (shot.fit === 'bg') { // real footage as a soft backdrop for a full-screen graphic
       g.save(); g.filter = 'blur(26px) saturate(1.1)';
       drawCover(g, ia, ib, mix, -50, -50, W + 100, H + 100, zoom * 1.06, shot.focal);
@@ -329,7 +313,7 @@ async function boot() {
       const p = clamp01((f - B.from + 0.5) / Math.max(1, Math.min(A.to, B.to) - B.from));
       blend(B.enter ?? 'fade', layers[0], layers[1], p);
     }
-    if (!plan.raw) finish(f);
+    finish(f);
     const top = live.at(-1);
     overlay.setArea(top?.fit === 'data' ? { x: top.panel.x + top.panel.w + 64 * overlay.S, right: W - 72 * overlay.S } : null);
     for (const cue of plan.cues) if (f >= cue.from && f < cue.to) overlay.draw(cue, cueEnv(cue, f));

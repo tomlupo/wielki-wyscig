@@ -24,7 +24,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   const clock = s => { const v = Math.floor(model.shown(s) + 1e-6); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
   const finishClock = i => clock(riders[i].finish) + (model.estimated(i) ? ' EST' : '');
   const km = d => (d / 1000).toFixed(1);
-  const gapText = g => g < 60 ? `+${Math.round(g)}s` : `+${Math.floor(g / 60)}:${String(Math.round(g % 60)).padStart(2, '0')}`;
+  const gapText = g => { const s = Math.round(g); return s < 60 ? `+${s}s` : `+${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
   // ---- the race, from the data -------------------------------------------------------------------
   const leads = events.filter(e => e.type === 'lead');
@@ -33,18 +33,9 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   const attacker = decisive.rider, attacked = decisive.other, tAttack = decisive.t, tWin = riders[winner].finish;
   const chaser = events.find(e => e.type === 'pass' && e.t > decisive.t && e.rank === 2)?.rider ?? second;
   const plus = i => gapText(riders[i].finish - riders[winner].finish);
-  // A rider's strongest 30 s of power, and their highest heart rate, with when.
-  const best30 = i => {
-    const s = riders[i].samples.filter(x => x.watts != null);
-    let best = null;
-    for (let a = 0; a < s.length; a++) { let sum = 0, n = 0; for (let b = a; b < s.length && s[b].t - s[a].t <= 30; b++) { sum += s[b].watts; n++; } if (n > 3 && (!best || sum / n > best.w)) best = { w: sum / n, t: s[a].t }; }
-    return best;
-  };
-  const peakHr = (i, t0 = 0, t1 = Infinity) => riders[i].samples.filter(x => x.hr != null && x.t >= t0 && x.t <= t1).reduce((m, x) => !m || x.hr > m.hr ? x : m, null);
-  const avgOf = (i, key, t0 = 0, t1 = Infinity) => { const x = riders[i].samples.filter(p => p[key] != null && p.t >= t0 && p.t <= t1); return x.length ? x.reduce((s, p) => s + p[key], 0) / x.length : null; };
   const at = (i, t, key) => interpolate(riders[i].samples, t, key);
-  const attackPower = best30(attacker);
-  const chaseHr = peakHr(chaser, tAttack - 30, tAttack + 120), lastHr = peakHr(second, tWin - 60, riders[second].finish + 1);
+  const attackPower = model.best30(attacker);
+  const chaseHr = model.peak(chaser, 'hr', tAttack - 30, tAttack + 120), lastHr = model.peak(second, 'hr', tWin - 60, riders[second].finish + 1);
 
   // Stamp for a phone clip: wall clock and road position, the facts the sync rests on.
   const stamp = (file, extra = {}) => {
@@ -71,7 +62,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
 
   // ===== ACT 1 · TITLE: the mountain from the air ==================================================
   const P = f => ({ d: len * f });
-  seg({ id: 'title', kind: '3d', dur: 4.6, snap: 'hit', enter: { type: 'whip', frames: 10 }, labels: 'none', focus: null,
+  seg({ id: 'title', kind: '3d', dur: 4.0, snap: 'hit', enter: { type: 'whip', frames: 10 }, labels: 'none', focus: null, sfx: [{ name: 'riser', at: -2.0, gain: 0.35 }],
     time: { t: 0, speed: 0 },
     cam: { type: 'flyover', ease: 'inOut', fov: 44, path: [
       { ...P(1), off: [-1100, 950, -1900], look: { d: len * 0.82 } },
@@ -81,7 +72,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
       { ...P(0), off: [-150, 170, 230], look: { d: 40 } },
     ] },
     cues: [
-      { type: 'title', at: 0.5, dur: 4.2, y: portrait ? 0.36 : 0.40, rule: 340, lines: [
+      { type: 'title', at: 0.4, dur: 'end', y: portrait ? 0.36 : 0.40, rule: 340, lines: [
         { text: 'WIELKI WYŚCIG', px: 34, w: 600, color: '#ffd34d', spacing: 0.3, gap: 10 },
         { text: 'COLL DE SA', px: portrait ? 132 : 150, gap: 0 },
         { text: 'BATALLA', px: portrait ? 132 : 150, gap: 22 },
@@ -95,13 +86,15 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   const allSeven = (village.fitPasses ?? []).length === riders.length;
   seg({ id: 'caimari', kind: 'clip', file: 'IMG_7771.MOV', dur: 2.6, src: { s: 2.0, speed: 1 }, enter: { type: 'flash', frames: 8 },
     cues: [stamp('IMG_7771.MOV', { place: 'CAIMARI' }),
-      { type: 'event', at: 0.2, dur: 'end', kicker: `CAIMARI · ${Math.round(model.stats.start)} M`, head: allSeven ? 'All seven' : 'The group', sub: `${km(len)} km and ${Math.round(model.stats.top - model.stats.start)} m to the top` }] });
+      { type: 'event', at: 0.2, dur: 'end', kicker: `CAIMARI · ${Math.round(model.stats.start)} M`, head: allSeven ? `All ${(WORDS[riders.length] ?? String(riders.length)).toLowerCase()}` : 'The group', sub: `${km(len)} km and ${Math.round(model.stats.top - model.stats.start)} m to the top` }] });
   seg({ id: 'sign', kind: 'clip', file: 'IMG_7772.MOV', dur: 2.2, src: { s: 0.1, speed: 1 }, fit16: 'blur',
     cues: [stamp('IMG_7772.MOV', { place: 'KM 0' }), { type: 'punch', at: 0.5, dur: 1.4, text: 'GO', px: 230 }] });
 
   // ===== RACE ON: the first moves, in the replay, pinned on the riders who made them ==================
-  // (deriveEvents' passes in the first few hundred metres, past the start-line shuffle)
-  const earlyAll = events.filter(e => e.type === 'pass' && e.t > 30 && e.t < 150).sort((a, b) => a.t - b.t);
+  // (deriveEvents' passes on the first 15% of the road, past the start-line shuffle of its first 1%). A pass names
+  // no place: the held race order only takes it up seconds later, and a caption may not say what does not yet hold.
+  const passD = e => model.distance(e.rider, e.t);
+  const earlyAll = events.filter(e => e.type === 'pass' && passD(e) > len * 0.01 && passD(e) < len * 0.15).sort((a, b) => a.t - b.t);
   // the busiest moment: the pass with the most passes in the 10 s from it (the first such, on a tie)
   const busiest = earlyAll.reduce((best, e) => { const n = earlyAll.filter(x => x.t >= e.t && x.t <= e.t + 10).length; return !best || n > best.n ? { e, n } : best; }, null);
   const early = busiest ? earlyAll.filter(e => e.t >= busiest.e.t) : [];
@@ -112,23 +105,23 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     seg({ id: 'gun', kind: '3d', dur, focus: early[0].rider, labels: [...movers, ...passed], enter: { type: 'whip', frames: 10 },
       time: { t: t0, speed }, cam: { type: 'chase', rider: early[0].rider, group: true, reach: 120, dist: 95, phi: 1.2, ahead: 25, fov: 34, swing: 'auto' },
       callouts: [
-        ...shown.map(e => ({ rider: e.rider, text: `↑ ${ordinal(e.rank).toUpperCase()}`, color: GREEN, at: at(e.t), dur: 'end' })),
+        ...shown.map(e => ({ rider: e.rider, text: '↑', color: GREEN, at: at(e.t), dur: 'end' })),
         // one ↓ per rider passed, from the first time
         ...passed.map(i => ({ rider: i, text: '↓', color: RED, at: at(shown.find(e => e.other === i).t), dur: 'end' })),
       ],
-      cues: [{ type: 'event', at: 0.3, dur: dur - 0.5, kicker: `KM ${km(model.distance(early[0].rider, early[0].t))} · ${clock(early[0].t)}`,
-        head: `${movers.map(name).join(' and ')} move up`, sub: `past ${passed.map(name).join(' and ')}, into ${shown.map(e => ordinal(e.rank)).join(' and ')}` }] });
+      cues: [{ type: 'event', at: Math.max(0.3, at(shown[0].t) - 0.5), dur: 'end', kicker: `KM ${km(passD(shown[0]))} · ${clock(shown[0].t)}`,
+        head: `${movers.map(name).join(' and ')} move up`, sub: `past ${passed.map(name).join(' and ')}` }] });
   }
 
   // ===== ACT 3 · THE CLIMB: the phones were there; so was the data ==================================
   // Data goes on the rider who is in the picture (clips.json, as Tom confirmed it).
   const seen = (file, k = 0) => R(clipInfo(file).sightings[k].rider);
   // Data shots run 4 s and more, so every number stays up long enough to read.
-  seg({ id: 'gorge', kind: 'clip', file: 'IMG_7774.MOV', dur: 4.2, src: { s: 0.0, speed: 1 },
+  seg({ id: 'gorge', kind: 'clip', file: 'IMG_7774.MOV', dur: 4.0, src: { s: 0.0, speed: 1 },
     cues: [stamp('IMG_7774.MOV'), { type: 'rider', at: 0.4, dur: 'end', rider: seen('IMG_7774.MOV') }] });
-  const passer = seen('IMG_7778.MOV'), passerPower = best30(passer);
+  const passer = seen('IMG_7778.MOV'), passerPower = model.best30(passer);
   // the group comes up the gorge road; the rider seen is the last of the three past the camera, as the shot ends
-  seg({ id: 'roadside', kind: 'clip', file: 'IMG_7778.MOV', dur: 4.2, src: { s: 2.0, speed: 1 }, enter: { type: 'flash', frames: 6 },
+  seg({ id: 'roadside', kind: 'clip', file: 'IMG_7778.MOV', dur: 4.0, src: { s: 2.2, speed: 1 }, enter: { type: 'flash', frames: 6 },
     cues: [stamp('IMG_7778.MOV'), passerPower
       ? { type: 'stat', at: 0.5, dur: 'end', rider: passer, value: passerPower.w, unit: 'W', label: `best 30 s of the climb · at ${clock(passerPower.t)}${passer === firstLead.rider ? ` · led from km ${km(model.distance(passer, firstLead.t))}` : ''}` }
       : { type: 'rider', at: 0.5, dur: 'end', rider: passer }] });
@@ -137,7 +130,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   const front = R(clipInfo('IMG_7782.MOV').group[0]), tWall = clipT('IMG_7782.MOV', 5);
   seg({ id: 'wall', kind: 'clip', file: 'IMG_7782.MOV', dur: 4.2, src: { s: 3.0, speed: 1 }, audio: 0.3,
     cues: [stamp('IMG_7782.MOV'),
-      ...(at(front, tWall, 'hr') != null ? [{ type: 'stat', at: 0.4, dur: 'end', rider: front, value: Math.round(at(front, tWall, 'hr')), unit: 'BPM', color: '#ff4d5a', label: `km ${km(model.distance(front, tWall))} · ${Math.round(avgOf(front, 'hr'))} bpm on average, the whole climb` }] : [])] });
+      ...(at(front, tWall, 'hr') != null ? [{ type: 'stat', at: 0.4, dur: 'end', rider: front, value: Math.round(at(front, tWall, 'hr')), unit: 'BPM', color: '#ff4d5a', label: `km ${km(model.distance(front, tWall))} · ${Math.round(model.avg(front, 'hr'))} bpm on average, the whole climb` }] : [])] });
 
   // ===== ACT 4 · THE ATTACK: no phone caught it; the data did =======================================
   // In the replay only the riders in the move are labelled: the rest of the race stays off the picture.
@@ -148,9 +141,8 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
       claims: [{ rider: attacked, rank: 0 }], fallback: { sub: `${name(attacked)}, ${name(attacker)} and ${name(chaser)}` } }] });
   // The attack: a broadcast alert blinking on the beat and ATTACK pinned on the rider, in real time; then the
   // peak of the effort.
-  const peakOf = (i, t0, t1) => riders[i].samples.filter(x => x.watts != null && x.t >= t0 && x.t <= t1).reduce((m, x) => !m || x.watts > m.watts ? x : m, null);
-  const attackPeak = peakOf(attacker, tAttack - 10, tAttack + 60);
-  seg({ id: 'attack', kind: '3d', dur: 4.4, snap: 'bar', focus: attacker, labels: three, enter: { type: 'flash', frames: 8 },
+  const attackPeak = model.peak(attacker, 'watts', tAttack - 10, tAttack + 60);
+  seg({ id: 'attack', kind: '3d', dur: 4.4, snap: 'bar', focus: attacker, labels: three, enter: { type: 'flash', frames: 8 }, sfx: [{ name: 'riser', at: -2.0, gain: 0.35 }],
     time: { t: tAttack, at: 0.4, speed: [[0, 1], [2.2, 1], [3.2, 2], [4.4, 2]] }, cam: { type: 'side', rider: attacker, dist: 90, fov: 26, ahead: 0, sign: -1, drift: 0.12, push: -0.03 },
     callouts: [{ rider: attacker, text: 'ATTACK', color: RED, at: 0, dur: 'end', blinkFor: 2.0 }],
     cues: [
@@ -168,37 +160,47 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     seg({ id: 'counter', kind: '3d', dur: 3.8, focus: counter.rider, labels: [counter.rider, counter.other],
       time: { t: t0, speed }, cam: { type: 'chase', rider: counter.rider, group: true, reach: 80, dist: 85, phi: 1.22, ahead: 20, fov: 30, swing: 'auto' },
       callouts: [
-        { rider: counter.rider, text: `↑ ${ordinal(counter.rank).toUpperCase()}`, color: GREEN, at: at(counter.t), dur: 'end' },
-        { rider: counter.other, text: `↓ ${ordinal(counter.rank + 1).toUpperCase()}`, color: RED, at: at(counter.t), dur: 'end' },
+        { rider: counter.rider, text: '↑', color: GREEN, at: at(counter.t), dur: 'end' },
+        { rider: counter.other, text: '↓', color: RED, at: at(counter.t), dur: 'end' },
       ],
+      // the lead it chases is a place, so it is a claim: held for the caption's whole time, or left out
       cues: [{ type: 'event', at: Math.max(0.2, at(counter.t) - 0.6), dur: 'end', kicker: `KM ${km(model.distance(counter.rider, counter.t))} · ${clock(counter.t)}`,
-        head: `${name(counter.rider)} up to ${ordinal(counter.rank)}`, sub: `${name(counter.other)} drops to ${ordinal(counter.rank + 1)}`, rider: counter.rider }] });
+        head: `${name(counter.rider)} passes ${name(counter.other)}`, sub: `the chase behind ${name(attacker)}`, rider: counter.rider,
+        claims: [{ rider: attacker, rank: 0 }], fallback: { sub: '' } }] });
   }
   // On El Halcon's wheel after the attack: the live numbers, on the rider in the picture.
   const followed = seen('IMG_7786.MOV');
-  seg({ id: 'wheel', kind: 'clip', file: 'IMG_7786.MOV', dur: 3.2, src: { s: 0.6, speed: 1 }, enter: { type: 'wipe', frames: 12 },
+  seg({ id: 'wheel', kind: 'clip', file: 'IMG_7786.MOV', dur: 3.4, src: { s: 0.6, speed: 1 }, enter: { type: 'wipe', frames: 12 },
     cues: [stamp('IMG_7786.MOV'), { type: 'rider', at: 0.3, dur: 'end', rider: followed }] });
   // El Halcon in front, Los Locos behind: both in the picture (as Tom confirmed), both hearts on screen. The gap
   // stays out of the words: the FIT rides put Los Locos 19 s back here, the picture shows a rider much closer.
   const pair = clipInfo('IMG_7787.MOV').group.map(R), tPair = clipT('IMG_7787.MOV', 16.5);
-  seg({ id: 'pass-profile', kind: 'clip', file: 'IMG_7787.MOV', dur: 4.2, src: { s: 14.0, speed: 1 }, audio: 0.2,
+  seg({ id: 'pass-profile', kind: 'clip', file: 'IMG_7787.MOV', dur: 4.0, src: { s: 14.2, speed: 1 }, audio: 0.2,
     cues: [stamp('IMG_7787.MOV'),
       { type: 'duel', at: 0.3, dur: 'end', metric: 'hr', riders: pair, colors: ['#f4f2ea', '#ff4d5a'], title: `heart rate · km ${km(model.distance(pair[0], tPair))}` }] });
   // Under the pines, 400 m from the top, the last footage before the line (the phone reached the col after the
   // first two): the power held since the attack. (No gap in numbers here either: the FIT rides and the picture
   // disagree on who is how far behind.)
-  const pines = seen('IMG_7789.MOV'), tPines = clipT('IMG_7789.MOV', 3.7), held = avgOf(pines, 'watts', tAttack, tPines);
+  const pines = seen('IMG_7789.MOV'), tPines = clipT('IMG_7789.MOV', 3.7), held = model.avg(pines, 'watts', tAttack, tPines);
   seg({ id: 'pines', kind: 'clip', file: 'IMG_7789.MOV', dur: 3.8, src: { s: 0.2, speed: 1 },
     cues: [stamp('IMG_7789.MOV'),
       ...(held != null ? [{ type: 'stat', at: 0.3, dur: 'end', y: 0.22, rider: pines, value: held, unit: 'W', label: `average since the attack · ${Math.round((len - model.distance(pines, tPines)) / 50) * 50} m to the top` }] : []),
       { type: 'profile', at: 0.3, dur: 'end', focus: pines }] });
+  // ...and on into the replay at the same second, a match cut: the rider has just passed the phone (its GPS fix is
+  // off by tens of metres here, so the place comes from the rider's own track), and the replay watches him ride
+  // away up the road from just behind that spot. The cut into it is not snapped, so the clip ends at exactly the
+  // race time this shot starts from.
+  const pinesEnd = 0.2 + 3.8; // the clip's last second: src s + the segment's length
+  seg({ id: 'pines-3d', kind: '3d', dur: 1.6, snap: false, focus: pines, labels: [pines],
+    time: { t: clipT('IMG_7789.MOV', pinesEnd), speed: 1 },
+    cam: { type: 'roadside', d: model.distance(pines, clipT('IMG_7789.MOV', pinesEnd)) - 18, look: 'up', follow: pines, blend: 0.2, lateral: 6, height: 3.5, fov: 46 } });
 
   // ===== ACT 5 · THE SUMMIT: the win on data alone, then everyone the phones caught ==================
   seg({ id: 'finish', kind: '3d', dur: 3.4, snap: 'hit', focus: winner, labels: [winner], enter: { type: 'dip', frames: 8 },
     time: { t: tWin, at: 1.8, speed: [[0, 2], [1.2, 1], [1.8, 0.6], [3.4, 0.6]] }, cam: { type: 'chase', rider: winner, dist: 110, phi: 1.3, ahead: 45, lift: 10, fov: 30, push: -0.03 },
     callouts: [{ rider: winner, text: 'WINNER', color: GOLD, at: 1.8, dur: 'end' }],
     cues: [{ type: 'punch', at: 1.8, dur: 'end', text: clock(tWin), px: 230, sub: `${name(winner)} wins` }] });
-  seg({ id: 'second', kind: '3d', dur: 2.6, focus: second, labels: [second], enter: { type: 'flash', frames: 6 },
+  seg({ id: 'second', kind: '3d', dur: 2.4, focus: second, labels: [second], enter: { type: 'flash', frames: 6 },
     time: { t: riders[second].finish, at: 1.0, speed: 1 }, cam: { type: 'chase', rider: second, dist: 100, phi: 1.3, ahead: 45, lift: 10, fov: 30 },
     cues: [
       { type: 'event', at: 0.1, dur: 'end', kicker: 'SECOND', head: `${name(second)} ${plus(second)}`, rider: second },
@@ -217,8 +219,8 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     seg({ id, kind: 'clip', file, dur, src: { s: s0, speed: 1 }, enter: more.enter, audio: more.audio, sfx: more.sfx,
       cues: [stamp(file, { place: 'THE COL' }), { ...finisher(file, i, sight.at, more.sub), at: 0.3, dur: 'end' }] });
   };
-  arrive('col-3', 'IMG_7792.MOV', 1.2, 2.8, { enter: { type: 'flash', frames: 6 } });
-  arrive('col-4', 'IMG_7793.MOV', 15.0, 2.8, { audio: 0.7 });
+  arrive('col-3', 'IMG_7792.MOV', 1.0, 3.0, { enter: { type: 'flash', frames: 6 } });
+  arrive('col-4', 'IMG_7793.MOV', 14.8, 3.0, { audio: 0.7 });
   // El Lobo lost a bet to Krzys; the penalty is the horn ("Klakson"). It sounds as El Lobo passes.
   const lobo = R('el-lobo'), krzys = R('krzys');
   arrive('col-5', 'IMG_7794.MOV', 8.6, 3.2, { sub: `${plus(lobo)}  ·  ${finishClock(lobo)}  ·  ${Math.round(riders[lobo].finish - riders[krzys].finish)} S BEHIND KRZYS: BET LOST`, sfx: [{ name: 'honk', at: 1.9 }] });
@@ -228,21 +230,20 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
     // With one of the two times an estimate (Karol has no official time) the gap is no number, just what the picture shows.
     const rel = model.estimated(a.i) || model.estimated(b.i) ? `RIGHT BEHIND ${name(a.i).toUpperCase()}`
       : `${apart} S ${riders[b.i].finish > riders[a.i].finish ? 'BEHIND' : 'FASTER THAN'} ${name(a.i).toUpperCase()}`;
-    seg({ id: 'col-last', kind: 'clip', file: 'IMG_7795.MOV', dur: 5.4, src: { s: 0.0, speed: 1 }, audio: 0.6,
+    seg({ id: 'col-last', kind: 'clip', file: 'IMG_7795.MOV', dur: 5.2, src: { s: 0.0, speed: 1 }, audio: 0.6,
       cues: [stamp('IMG_7795.MOV', { place: 'THE COL' }),
-        { ...finisher('IMG_7795.MOV', a.i, a.at), at: 0.1, dur: 2.6 },
-        { ...finisher('IMG_7795.MOV', b.i, b.at, `${plus(b.i)}  ·  ${finishClock(b.i)}  ·  ${rel}`), at: 2.7, dur: 'end' },
+        { ...finisher('IMG_7795.MOV', a.i, a.at), at: 0.1, dur: 2.4 },
+        { ...finisher('IMG_7795.MOV', b.i, b.at, `${plus(b.i)}  ·  ${finishClock(b.i)}  ·  ${rel}`), at: 2.5, dur: 'end' },
       ] });
   }
 
   // ===== ACT 6 · FINALE: results, the gap chart, the end card ======================================
   // the results over the col itself (the summit sign, the café), softened
-  seg({ id: 'results', kind: 'clip', file: 'IMG_7794.MOV', fit: 'bg', dim: 0.58, dur: 3.8, snap: 'bar', src: { s: 13.6, speed: 1 }, enter: { type: 'fade', frames: 12 },
+  seg({ id: 'results', kind: 'clip', file: 'IMG_7794.MOV', fit: 'bg', dim: 0.58, dur: 3.6, snap: 'bar', src: { s: 13.6, speed: 1 }, enter: { type: 'fade', frames: 12 },
     cues: [{ type: 'results', at: 0.2, dur: 'end' }] });
-  seg({ id: 'gaps', kind: 'clip', file: 'IMG_7782.MOV', fit: 'bg', dim: 0.6, dur: 3.0, src: { s: 11.0, speed: 1 },
+  seg({ id: 'gaps', kind: 'clip', file: 'IMG_7782.MOV', fit: 'bg', dim: 0.6, dur: 3.6, src: { s: 11.0, speed: 1 },
     cues: [{ type: 'gaps', at: 0.15, dur: 'end' }] });
-  seg({ id: 'selfie', kind: 'clip', file: 'VMGY3907.MP4', dur: 1.6, src: { s: 0.6, speed: 1 }, enter: { type: 'flash', frames: 6 }, fit16: 'blur', audio: 0.6 });
-  seg({ id: 'end', kind: 'clip', file: 'IMG_7795.MOV', fit: 'bg', dim: 0.66, dur: 2.8, src: { s: 3.6, speed: 1 }, enter: { type: 'fade', frames: 12 },
+  seg({ id: 'end', kind: 'clip', file: 'IMG_7795.MOV', fit: 'bg', dim: 0.66, dur: 2.6, src: { s: 3.6, speed: 1 }, enter: { type: 'fade', frames: 12 },
     cues: [{ type: 'end', at: 0.1, dur: 'end', credits: [
       ...(credits.music ? [credits.music] : []),
       'Aerial imagery and 5 m LiDAR elevation © IGN (PNOA, MDT05), CC BY 4.0',
@@ -256,7 +257,6 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
 }
 
 const WORDS = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE'];
-export function ordinal(n) { return n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] ?? 'th'); }
 function localTime(epoch, offset) {
   const sign = offset?.[0] === '-' ? -1 : 1, mins = offset ? sign * (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(3, 5))) : 0;
   const d = new Date((epoch + mins * 60) * 1000);

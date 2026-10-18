@@ -48,15 +48,14 @@ async function sfxFile(name) {
 }
 
 // Where the sound design goes, from the plan: whooshes on whips and zooms, an impact on every punch
-// word and flash, a riser into the title and the attack.
+// word, flash and alert, and whatever a segment asks for itself (`sfx`: the risers, the horn).
 function sfxCues(plan) {
   const cues = [];
   for (const s of plan.shots) {
     const cut = s.start / plan.fps;
     if (s.enter === 'whip' || s.enter === 'zoom') cues.push({ name: 'whoosh', at: cut - 0.4, gain: 0.5 });
     if (s.enter === 'flash') cues.push({ name: 'impact', at: cut - 0.02, gain: 0.45 });
-    if (s.id === 'title' || s.id === 'attack') cues.push({ name: 'riser', at: cut - 2.0, gain: 0.35 });
-    for (const fx of s.sfx ?? []) cues.push({ name: fx.name, at: cut + fx.at, gain: fx.gain ?? 0.6 }); // the storyboard's own
+    for (const fx of s.sfx ?? []) cues.push({ name: fx.name, at: cut + fx.at, gain: fx.gain ?? 0.6 }); // the storyboard's own (risers, the horn)
   }
   for (const c of plan.cues) {
     if (c.type === 'punch') cues.push({ name: 'impact', at: c.from / plan.fps - 0.02, gain: 0.8 });

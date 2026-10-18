@@ -48,6 +48,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
   // ---- cut points on the beat ----------------------------------------------------------------
   const total = segments.reduce((s, x) => s + x.dur, 0);
   const g = grid(beats, total);
+  if (!g.synthetic && (g.beats.at(-1) ?? 0) < total + 2) throw new Error(`${beats.file}: its beats run out ${(g.beats.at(-1) ?? 0).toFixed(1)} s into a ${total.toFixed(1)} s edit; use a longer track`);
   const bounds = [0];
   let nominal = 0;
   segments.forEach((s, i) => {
@@ -82,6 +83,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     const shot = { id: s.id, kind: s.kind, from: x.from, to: x.to, start: x.start, end: x.end, enter: s.enter?.type ?? null, focus: s.focus ?? null, labels: s.labels ?? 'all' };
     if (s.dim) shot.dim = s.dim;
     if (s.sfx) shot.sfx = s.sfx;
+    if (s.snap === false) shot.unsnapped = true; // its cut keeps the storyboard's time (a match cut), off the beat
     // race moves pinned on riders in the 3D picture (ATTACK, ↑ 2ND), in frames like the cues
     if (s.callouts) shot.callouts = s.callouts.map(c => ({ ...c, from: x.start + frameOf(c.at ?? 0), to: c.dur == null || c.dur === 'end' ? x.end : Math.min(x.end, x.start + frameOf((c.at ?? 0) + c.dur)) }));
     if (s.kind === '3d') {
@@ -117,7 +119,8 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
   // ---- graphics ------------------------------------------------------------------------------------
   const byId = Object.fromEntries(out.map(s => [s.id, s]));
   const cues = [];
-  const place = c => {
+  // A cue's own properties, without its storyboard timing (at/dur/from/to/skip), which become frames here.
+  const cueProps = c => {
     const { type, at = 0, dur = 'end', from: _f, to: _t, skip: _s, atSrc: _a, ...props } = c;
     return { type, ...props };
   };
@@ -125,7 +128,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     for (const c of segments[i].cues ?? []) {
       const from = shot.start + frameOf(c.at ?? 0);
       const to = c.dur === 'end' || c.dur == null ? shot.end : Math.min(shot.end, from + frameOf(c.dur));
-      if (to > from) cues.push({ ...place(c), from, to, seg: shot.id });
+      if (to > from) cues.push({ ...cueProps(c), from, to, seg: shot.id });
     }
   });
   for (const sp of spans) {
@@ -134,7 +137,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     for (let k = a; k <= b + 1; k++) {
       const skip = k > b || sp.skip?.includes(out[k].id);
       if (!skip && runFrom == null) runFrom = out[k].start;
-      if (skip && runFrom != null) { cues.push({ ...place(sp), from: runFrom, to: out[k - 1].end }); runFrom = null; }
+      if (skip && runFrom != null) { cues.push({ ...cueProps(sp), from: runFrom, to: out[k - 1].end }); runFrom = null; }
     }
   }
   // The race time each frame shows (the shot on top that has one).
@@ -153,7 +156,8 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     const ok = ts.length && c.claims.every(k => model.holdsRank(k.rider, k.rank, Math.min(...ts), Math.max(...ts)));
     if (!ok) Object.assign(c, c.fallback ?? { head: '', sub: '' });
     c.claimsHeld = !!ok;
-    delete c.claims; delete c.fallback;
+    if (!ok) delete c.claims; // a held claim stays on the cue, so it can be checked again (tests/reel.test.js)
+    delete c.fallback;
   }
   const fades = [{ from: frames - frameOf(1.2), to: frames, dir: 'out' }];
 

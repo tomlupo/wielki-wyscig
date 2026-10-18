@@ -36,6 +36,7 @@ function encode(framesDir, audio, out, { fps, preview }) {
       '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '22' : '16', '-profile:v', 'high', '-tune', 'grain',
       ...(preview ? [] : ['-maxrate', '24M', '-bufsize', '48M']),
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+      '-x264-params', 'colorprim=bt709:transfer=bt709:colormatrix=bt709',
       '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-shortest', '-movflags', '+faststart', out];
     const p = spawn('ffmpeg', a, { stdio: ['ignore', 'ignore', 'pipe'] });
     let err = ''; p.stderr.on('data', d => { err += d; });

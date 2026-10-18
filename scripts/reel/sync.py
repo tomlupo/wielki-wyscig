@@ -111,6 +111,22 @@ def probe(path: Path) -> dict:
     }
 
 
+def along_route_3d(
+    p: np.ndarray, alt: float, route: np.ndarray
+) -> tuple[float, float, float]:
+    """fit_to_race.along_route for one fix, choosing among the road legs within NEAR_M by plan offset
+    plus height mismatch (phone GPS height is good to ~10 m): road distance, offset, road altitude."""
+    A, B = route[:-1, :2], route[1:, :2]
+    AB = B - A
+    t = np.clip(((p - A) * AB).sum(1) / (AB**2).sum(1), 0, 1)
+    off = np.sqrt(((p - (A + t[:, None] * AB)) ** 2).sum(1))
+    d = route[:-1, 3] + t * (route[1:, 3] - route[:-1, 3])
+    a = route[:-1, 2] + t * (route[1:, 2] - route[:-1, 2])
+    cost = np.where(off < NEAR_M, off + np.abs(alt - a), np.inf)
+    k = int(np.argmin(cost))
+    return float(d[k]), float(off[k]), float(a[k])
+
+
 def time_at_distance(samples: list[dict], d: float) -> float:
     """First arrival at road distance d (as src/race.js timeAtDistance)."""
     if d <= samples[0]["d"]:
@@ -163,11 +179,17 @@ def main() -> None:
         if p.suffix.lower() in (".mov", ".mp4")
     ]
     for c in clips:
-        c["d"] = c["offRoad"] = None
+        c["d"] = c["offRoad"] = c["altDelta"] = None
         if c["gps"]:
             P = ftr.project([c["gps"]], terrain)
             d, off = ftr.along_route(P, route)
             c["d"], c["offRoad"] = round(float(d[0]), 1), round(float(off[0]), 1)
+            if c["gps"]["alt"] is not None and off[0] < NEAR_M:
+                # The check on the projection: the fix's own altitude against the road's at d. On a stack of
+                # hairpins the nearest leg in plan can be the wrong one; the leg that also fits the height wins.
+                d2, off2, alt2 = along_route_3d(P[0], c["gps"]["alt"], route)
+                c["d"], c["offRoad"] = round(d2, 1), round(off2, 1)
+                c["altDelta"] = round(c["gps"]["alt"] - alt2, 1)
         c["onClimb"] = (
             c["d"] is not None and c["offRoad"] < NEAR_M and c["epoch"] is not None
         )

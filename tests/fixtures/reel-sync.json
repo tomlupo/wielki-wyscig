@@ -16,6 +16,7 @@
    "epoch": 1792225277,
    "d": 5947.1,
    "offRoad": 17305.6,
+   "altDelta": null,
    "onClimb": false,
    "raceT0": -5233.37,
    "kind": "off-route"
@@ -32,6 +33,7 @@
    "epoch": 1792225285,
    "d": 5947.1,
    "offRoad": 17251.7,
+   "altDelta": null,
    "onClimb": false,
    "raceT0": -5225.37,
    "kind": "off-route"
@@ -48,6 +50,7 @@
    "epoch": 1792230434,
    "d": 0,
    "offRoad": 372.9,
+   "altDelta": null,
    "onClimb": false,
    "raceT0": -76.37,
    "kind": "off-route"
@@ -64,6 +67,7 @@
    "epoch": 1792230499,
    "d": 0,
    "offRoad": 238.7,
+   "altDelta": null,
    "onClimb": false,
    "raceT0": -11.37,
    "kind": "off-route"
@@ -80,6 +84,7 @@
    "epoch": 1792230712,
    "d": 741.3,
    "offRoad": 4.9,
+   "altDelta": 8.1,
    "onClimb": true,
    "raceT0": 201.63,
    "kind": "riding"
@@ -96,6 +101,7 @@
    "epoch": 1792231109,
    "d": 2535.3,
    "offRoad": 0.7,
+   "altDelta": -2.8,
    "onClimb": true,
    "raceT0": 598.63,
    "kind": "riding"
@@ -112,6 +118,7 @@
    "epoch": 1792231469,
    "d": 4167.4,
    "offRoad": 3.2,
+   "altDelta": 1.7,
    "onClimb": true,
    "raceT0": 958.63,
    "kind": "riding"
@@ -126,11 +133,12 @@
    "audio": true,
    "utcOffset": "+0200",
    "epoch": 1792231826,
-   "d": 5999.9,
-   "offRoad": 7.4,
+   "d": 6204.5,
+   "offRoad": 16.5,
+   "altDelta": 11.3,
    "onClimb": true,
    "raceT0": 1315.63,
-   "kind": "outlier"
+   "kind": "riding"
   },
   {
    "file": "IMG_7787.MOV",
@@ -144,6 +152,7 @@
    "epoch": 1792231850,
    "d": 6499.1,
    "offRoad": 1,
+   "altDelta": -4.9,
    "onClimb": true,
    "raceT0": 1339.63,
    "kind": "riding"
@@ -160,6 +169,7 @@
    "epoch": 1792232043,
    "d": 7429.3,
    "offRoad": 0.8,
+   "altDelta": 0.3,
    "onClimb": true,
    "raceT0": 1532.63,
    "kind": "riding"
@@ -176,6 +186,7 @@
    "epoch": 1792232177,
    "d": 7743.7,
    "offRoad": 16.4,
+   "altDelta": -1.2,
    "onClimb": true,
    "raceT0": 1674.31,
    "kind": "summit",
@@ -199,6 +210,7 @@
    "epoch": 1792232308,
    "d": 7701.7,
    "offRoad": 0.4,
+   "altDelta": -1,
    "onClimb": true,
    "raceT0": 1796.06,
    "kind": "summit",
@@ -222,6 +234,7 @@
    "epoch": 1792232374,
    "d": 7690.6,
    "offRoad": 1.1,
+   "altDelta": -0.2,
    "onClimb": true,
    "raceT0": 1855.88,
    "kind": "summit",
@@ -245,6 +258,7 @@
    "epoch": 1792232484,
    "d": 7690.6,
    "offRoad": 1.1,
+   "altDelta": 5.1,
    "onClimb": true,
    "raceT0": 1974.14,
    "kind": "summit",
@@ -273,6 +287,7 @@
    "epoch": 1792235056,
    "d": null,
    "offRoad": null,
+   "altDelta": null,
    "onClimb": false,
    "raceT0": 4545.63,
    "kind": "off-route"

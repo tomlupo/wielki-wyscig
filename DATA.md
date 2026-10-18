@@ -59,6 +59,10 @@ Private repository visibility does not itself protect a deployed app. Existing V
 
 Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSource(...))`).
 
+## Rider colours
+
+A rider's `color` is their helmet colour: it marks them everywhere (labels, standings, profile, trail, charts, results card). When two riders share a helmet colour, the one listed later is drawn as a ring instead of a dot, and with a dashed line on the results card's gap chart.
+
 ## URL state
 
 `?t=<seconds>&r=<rider id>&cam=<follow|overview|side|free>&x=<1|4|16>` opens the replay at that moment and skips the intro (`src/state.js`). The Share button copies this link.
@@ -84,5 +88,5 @@ Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not stre
 17.10 was built with:
 
 ```
-uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Los Locos=rides/los-locos.fit:#4fc3f7@26:59" "El Szczupak=rides/el-szczupak.fit:#ef5350@28:05" "Krzys=rides/krzys.fit:#66bb6a@30:29" "Rafi=rides/rafi.fit:#ab47bc@33:15" "El Halcon=rides/el-halcon.fit:#ff8a65@26:50" "Karol=rides/karol.fit:#26c6da"
+uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#e53935@31:34" "Los Locos=rides/los-locos.fit:#f2f2ee@26:59" "El Szczupak=rides/el-szczupak.fit:#3d8bfd@28:05" "Krzys=rides/krzys.fit:#9ea4ad@30:29" "Rafi=rides/rafi.fit:#f2f2ee@33:15" "El Halcon=rides/el-halcon.fit:#ff8a1f@26:50" "Karol=rides/karol.fit:#9ea4ad"
 ```

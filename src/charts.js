@@ -27,9 +27,8 @@ export function renderProfile(svgEl, profile, len, riders, onSeek) {
     svg.append('text').attr('class', 'p-alt').attr('x', w - m.r).attr('y', 10).attr('text-anchor', 'end').text(`${Math.round(profile.at(-1).ele)} m`);
     guide = svg.append('line').attr('class', 'p-guide').attr('y1', m.t - 4).attr('y2', h - m.b);
     dots = riders.map(r => {
-      const g = svg.append('g').attr('class', 'p-dot').style('--c', r.color);
+      const g = svg.append('g').attr('class', r.ring ? 'p-dot ring' : 'p-dot').style('--c', r.color);
       g.append('circle').attr('r', 6.5);
-      g.append('text').attr('dy', 3.2).text(r.letter);
       return g;
     });
     svg.append('rect').attr('class', 'p-hit').attr('x', 0).attr('y', 0).attr('width', w).attr('height', h)

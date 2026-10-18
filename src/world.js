@@ -286,7 +286,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     const label = document.createElement('button');
     label.className = 'rlabel';
     label.style.setProperty('--c', data.color);
-    label.innerHTML = `<b>${data.letter}</b><span></span><em hidden></em>`;
+    label.innerHTML = `<b${data.ring ? ' class="ring"' : ''}></b><span></span><em hidden></em>`;
     label.querySelector('span').textContent = data.name;
     const more = label.querySelector('em');
     label.setAttribute('aria-label', `Follow ${data.name}`);

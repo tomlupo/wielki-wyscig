@@ -84,7 +84,7 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
     if (s.dim) shot.dim = s.dim;
     if (s.sfx) shot.sfx = s.sfx;
     if (s.snap === false) shot.unsnapped = true; // its cut keeps the storyboard's time (a match cut), off the beat
-    // race moves pinned on riders in the 3D picture (ATTACK, ↑ 2ND), in frames like the cues
+    // race moves pinned on riders in the 3D picture (ATTACK, ↑/↓ for a pass, WINNER), in frames like the cues
     if (s.callouts) shot.callouts = s.callouts.map(c => ({ ...c, from: x.start + frameOf(c.at ?? 0), to: c.dur == null || c.dur === 'end' ? x.end : Math.min(x.end, x.start + frameOf((c.at ?? 0) + c.dur)) }));
     if (s.kind === '3d') {
       const t = mapFrames({ n, fps, ramp: s.time.speed, anchor: { value: s.time.t, at: s.time.at ?? 0 }, offset });

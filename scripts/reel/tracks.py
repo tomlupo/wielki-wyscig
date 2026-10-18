@@ -9,9 +9,9 @@
 race.json keeps only the climb, on one race clock (DATA.md, Clock). The FIT files keep the
 wall clock, so here each rider gets the UTC seconds they crossed the start line and the top
 (the same cut as scripts/fit_to_race.py, imported), the k that maps their GPS seconds onto
-the race clock, and a 1 Hz track around the climb: position in the terrain frame and road
-distance. The clip sync reads it to see exactly who passed each camera, and when. Nothing
-else of the ride (its route away from the climb, its totals) leaves the FIT file.
+the race clock, and a 1 Hz track from PAD_S before the climb to PAD_S after it: position in the
+terrain frame and road distance. The clip sync reads it to see exactly who passed each camera,
+and when. No totals, heart rate or power of the ride are copied out; the output is git-ignored.
 """
 
 from __future__ import annotations

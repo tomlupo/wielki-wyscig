@@ -158,7 +158,7 @@ async function boot() {
     }
     drawCallouts(g, shot, f, items, S);
   }
-  // A race move on the rider it belongs to (ATTACK, ↑ 2ND): a pill over the rider's label (or the pile that holds
+  // A race move on the rider it belongs to (ATTACK, ↑/↓ for a pass, WINNER): a pill over the rider's label (or the pile that holds
   // it) that pops in and blinks on the beat while it is fresh.
   function drawCallouts(g, shot, f, items, S) {
     const stacked = new Map();

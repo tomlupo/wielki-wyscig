@@ -1,7 +1,8 @@
 // The edit: the race told in acts, mostly on the riders' own phone footage with their data on it
-// (power, heart rate, gaps, places), the 3D replay only where no phone was: the title, the attack,
-// the win. Segments carry nominal durations (the planner snaps every cut to the music) and the
-// graphics that ride on them.
+// (power, heart rate, gaps, places), the 3D replay for what no phone caught: the title, the first
+// moves, the attack and the answer to it, the win, and the last 400 m, which it takes over from the
+// last clip in a match cut. Segments carry nominal durations (the planner snaps every cut to the
+// music, a match cut excepted) and the graphics that ride on them.
 //
 // Race moments come from the data (deriveEvents, the riders' samples), clip moments from the
 // editor's log and the FIT-synced clock (sync.json). Nothing is a hard-coded race time: change
@@ -116,7 +117,7 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
   // ===== ACT 3 · THE CLIMB: the phones were there; so was the data ==================================
   // Data goes on the rider who is in the picture (clips.json, as Tom confirmed it).
   const seen = (file, k = 0) => R(clipInfo(file).sightings[k].rider);
-  // Data shots run 4 s and more, so every number stays up long enough to read.
+  // Data shots run about 4 s, so the numbers stay up long enough to read.
   seg({ id: 'gorge', kind: 'clip', file: 'IMG_7774.MOV', dur: 4.0, src: { s: 0.0, speed: 1 },
     cues: [stamp('IMG_7774.MOV'), { type: 'rider', at: 0.4, dur: 'end', rider: seen('IMG_7774.MOV') }] });
   const passer = seen('IMG_7778.MOV'), passerPower = model.best30(passer);

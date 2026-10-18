@@ -576,7 +576,7 @@ export function createOverlay(ctx, { W, H, model, beatPhase = f => (f / 15) % 1 
       // the rest
       let ry = base + 40 * S;
       model.byFinish.slice(3).forEach((i, k) => {
-        const r = riders[i], u = easeOut(clamp01((e.since - 1.1 - k * 0.12) / 0.45));
+        const r = riders[i], u = easeOut(clamp01((e.since - 0.6 - k * 0.08) / 0.35)); // all in by ~1.2 s, to leave time to read
         const rh = 66 * S;
         ctx.save(); ctx.globalAlpha = a * u; ctx.translate((1 - u) * 50 * S, 0);
         ctx.fillStyle = LINE; ctx.fillRect(x, ry + rh - 1.5 * S, w, 1.5 * S);

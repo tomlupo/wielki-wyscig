@@ -101,7 +101,10 @@ export function storyboard({ model, sync, fmt, credits = {} }) {
 
   // ===== RACE ON: the first moves, in the replay, pinned on the riders who made them ==================
   // (deriveEvents' passes in the first few hundred metres, past the start-line shuffle)
-  const early = events.filter(e => e.type === 'pass' && e.t > 30 && e.t < 150).sort((a, b) => a.t - b.t);
+  const earlyAll = events.filter(e => e.type === 'pass' && e.t > 30 && e.t < 150).sort((a, b) => a.t - b.t);
+  // the busiest moment: the pass with the most passes in the 10 s from it (the first such, on a tie)
+  const busiest = earlyAll.reduce((best, e) => { const n = earlyAll.filter(x => x.t >= e.t && x.t <= e.t + 10).length; return !best || n > best.n ? { e, n } : best; }, null);
+  const early = busiest ? earlyAll.filter(e => e.t >= busiest.e.t) : [];
   if (early.length) {
     const t0 = Math.max(0, early[0].t - 6), speed = 3, dur = 4.4, at = t => (t - t0) / speed; // race time → segment second
     const shown = early.filter(e => at(e.t) < dur - 0.6);

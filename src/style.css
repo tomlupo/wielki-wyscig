@@ -319,7 +319,6 @@ svg { display: block; }
   .app.playing .focus:not(.pinned) .togo b { font-size: 20px; }
   .app.playing .focus:not(.pinned) .togo span { font-size: 10px; }
   .app.playing .focus:not(.pinned) { padding-top: 8px; padding-bottom: 7px; }
-  .app.playing .cams { top: calc(var(--safe-t) + 178px); }
 
   /* One camera button: the current shot. Tapped, the others drop out under it. */
   .cams button { order: 1; }
@@ -329,14 +328,22 @@ svg { display: block; }
     border: 3.5px solid transparent; border-right-color: currentColor; border-bottom-color: currentColor; opacity: 0.55; }
   .cams.open button:not([aria-pressed='true']) { animation: cam-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 }
+@keyframes cam-in-row { from { opacity: 0; transform: translateX(8px) scale(0.9); } }
 @keyframes cam-in { from { opacity: 0; transform: translateY(-8px) scale(0.9); } }
+/* Tall phones: the slim card is shorter, so the camera button moves up under it (not when the full card is pinned open). */
+@media (max-width: 959px) and (min-height: 641px) {
+  .app.playing:has(.focus:not(.pinned)) .cams { top: calc(var(--safe-t) + 178px); }
+}
 
 /* Phones: a tall sheet reaches up over the rider card and the camera rail. Both are out of reach under it,
    so they step aside instead of showing cut in half (main.js sets the class). */
 .app.sheet-over-card :is(.focus, .cams) { opacity: 0; pointer-events: none; transition: opacity 0.25s; }
 /* Landscape phones: no height for a column, so the rail is a row on the right, just above the sheet. */
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 959px) {
-  .cams, .app.playing .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
+  .cams { top: auto; bottom: calc(var(--sheet-visible) + 10px); flex-direction: row; }
+  /* The row grows leftward from the right edge: the current shot stays last, under the finger. */
+  .cams button[aria-pressed='true'] { order: 2; }
+  .cams.open button:not([aria-pressed='true']) { animation-name: cam-in-row; }
   .cams button { width: 40px; height: 40px; border-radius: 12px; }
   .cams svg { width: 20px; height: 20px; }
   .tv-cap { max-width: calc(100% - 2 * var(--gutter) - 240px); }

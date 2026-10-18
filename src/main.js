@@ -288,6 +288,7 @@ async function boot() {
     if (on && time >= duration) { time = 0; finishedShown = false; }
     playing = on;
     app.classList.toggle('playing', on);
+    coverCard(); // the card is slim while playing, full when paused
     $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
     if (!on) pushState(true);
   }
@@ -328,7 +329,7 @@ async function boot() {
     focus.style.removeProperty('--drag');
     if (e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { autoOff(); stepRider(dx < 0 ? 1 : -1); }
     // A tap keeps the full card open during playback (phones show a slim one while playing); a second tap lets it go.
-    else if (e.type === 'pointerup' && Math.abs(dx) < 8 && Math.abs(dy) < 8 && !desktop.matches) focus.classList.toggle('pinned');
+    else if (e.type === 'pointerup' && Math.abs(dx) < 8 && Math.abs(dy) < 8 && !desktop.matches) { focus.classList.toggle('pinned'); coverCard(); }
   };
   focus.addEventListener('pointerup', endSwipe);
   focus.addEventListener('pointercancel', endSwipe);
@@ -342,7 +343,9 @@ async function boot() {
       cams.classList.add('open'); b.setAttribute('aria-expanded', 'true');
       return;
     }
+    const wasOpen = cams.classList.contains('open');
     closeCams();
+    if (wasOpen && b.getAttribute('aria-pressed') === 'true') return; // closing the menu on the current shot changes nothing (and keeps Auto on)
     setCam(b.dataset.cam);
   });
   document.addEventListener('pointerdown', e => { if (cams.classList.contains('open') && !cams.contains(e.target)) closeCams(); });
@@ -391,13 +394,17 @@ async function boot() {
     const half = $('board').getBoundingClientRect().bottom - sheetY - top + 14;
     return { peek, half: Math.min(half, sheet.offsetHeight), full: sheet.offsetHeight };
   }
+  // A tall sheet (seven riders fill "half" too) slides over the rider card: the card steps aside rather than show cut in half.
+  function coverCard(cardBottom = focus.getBoundingClientRect().bottom) {
+    app.classList.toggle('sheet-over-card', !desktop.matches && innerHeight - (sheet.offsetHeight - sheetY) < cardBottom - 12);
+  }
   function placeSheet(y, animate = true) {
+    const cardBottom = focus.getBoundingClientRect().bottom; // read before the writes below: one layout per drag move
     sheetY = Math.max(0, y);
     sheet.style.transition = animate ? '' : 'none';
     sheet.style.transform = desktop.matches ? '' : `translate3d(0,${sheetY}px,0)`;
     app.style.setProperty('--sheet-visible', desktop.matches ? '0px' : `${sheet.offsetHeight - sheetY}px`);
-    // A tall sheet (seven riders fill "half" too) slides over the rider card: the card steps aside rather than show cut in half.
-    app.classList.toggle('sheet-over-card', !desktop.matches && innerHeight - (sheet.offsetHeight - sheetY) < focus.getBoundingClientRect().bottom - 12);
+    coverCard(cardBottom);
   }
   function setSnap(name, animate = true) {
     snap = name;

@@ -127,6 +127,34 @@ def along_route_3d(
     return float(d[k]), float(off[k]), float(a[k])
 
 
+PASS_M = 40.0  # a rider whose track comes this close to the camera's GPS fix passes the camera
+
+
+def fit_passes(c: dict, tracks: dict, cam: np.ndarray) -> list[dict]:
+    """Riders whose FIT track passes within PASS_M of the camera during the clip (±5 s): when, how close.
+    The camera's fix is taken as the recording starts and can be a few seconds stale, so `at` is
+    approximate; the editor's sightings (clips.json) give the exact second."""
+    out = []
+    for rid, tr in tracks.items():
+        t = tr["t0"] + np.arange(len(tr["x"]))
+        win = (t >= c["epoch"] - 5) & (t <= c["epoch"] + c["duration"] + 5)
+        if not win.any():
+            continue
+        dist = np.hypot(
+            np.asarray(tr["x"])[win] - cam[0], np.asarray(tr["z"])[win] - cam[1]
+        )
+        k = int(np.argmin(dist))
+        if dist[k] < PASS_M:
+            out.append(
+                {
+                    "rider": rid,
+                    "at": round(float(t[win][k] - c["epoch"]), 1),
+                    "dist": round(float(dist[k]), 1),
+                }
+            )
+    return sorted(out, key=lambda p: p["at"])
+
+
 def time_at_distance(samples: list[dict], d: float) -> float:
     """First arrival at road distance d (as src/race.js timeAtDistance)."""
     if d <= samples[0]["d"]:
@@ -163,6 +191,7 @@ def main() -> None:
     ap.add_argument("--videos", default=str(ROOT / "data" / "videos"))
     ap.add_argument("--out", default=str(ROOT / "out" / "reel" / "sync.json"))
     ap.add_argument("--clips", default=str(ROOT / "scripts" / "reel" / "clips.json"))
+    ap.add_argument("--tracks", default=str(ROOT / "out" / "reel" / "tracks.json"))
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -251,14 +280,46 @@ def main() -> None:
             )
     S = float(np.median([s["start"] for s in seen])) if seen else S_auto
 
+    # With the riders' own FIT rides (tracks.py → tracks.json) the clock needs no inference: rider r's
+    # race.json time at wall time T is (T - climb start_r) x stretch_r, and their 1 Hz track shows who
+    # passed each camera. Then the vote and the sightings above are only the cross-check.
+    tracks = (
+        json.loads(Path(args.tracks).read_text())["riders"]
+        if Path(args.tracks).exists()
+        else None
+    )
+
+    def race_t(rid: str, T: float) -> float:
+        return (T - tracks[rid]["climbStart"]) * tracks[rid]["stretch"]
+
     for c in clips:
         c["raceT0"] = None if c["epoch"] is None else round(c["epoch"] - S, 2)
+        if tracks and c["epoch"] is not None:
+            c["raceT0"] = round(
+                float(np.median([race_t(rid, c["epoch"]) for rid in tracks])), 2
+            )
+            if c["gps"] and c["offRoad"] is not None and c["offRoad"] < 500:
+                c["fitPasses"] = fit_passes(
+                    c, tracks, ftr.project([c["gps"]], terrain)[0]
+                )
         mine = [s for s in seen if s["file"] == c["file"]]
         if mine:  # this clip's own clock: the identified riders pass when the race data says they do
+            if tracks:
+                for s in mine:
+                    s["t"] = race_t(s["rider"], c["epoch"] + s["at"])
             c["raceT0"] = round(float(np.median([s["t"] - s["at"] for s in mine])), 2)
             c["sightings"] = [
                 {k: s[k] for k in ("rider", "at")}
                 | {"offsetFromStart": round(s["start"] - S, 1)}
+                | (
+                    {
+                        "fit": any(
+                            p["rider"] == s["rider"] for p in c.get("fitPasses", [])
+                        )
+                    }
+                    if tracks
+                    else {}
+                )
                 for s in mine
             ]
         if not c["onClimb"]:
@@ -298,9 +359,28 @@ def main() -> None:
         },
         "clips": clips,
     }
+    if tracks:
+        starts = [tr["climbStart"] for tr in tracks.values()]
+        mid = float(np.median(starts))
+        out["start"]["fit"] = {
+            "local": clock(mid, offset),
+            "epoch": round(mid, 1),
+            "spread": [
+                round(float(min(starts) - mid), 1),
+                round(float(max(starts) - mid), 1),
+            ],
+            "stretch": round(
+                float(np.median([tr["stretch"] for tr in tracks.values()])), 4
+            ),
+        }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(out, indent=1))
 
+    if tracks:
+        f = out["start"]["fit"]
+        print(
+            f"clock from the FIT rides: climb starts {f['local']} ({f['spread']} s), race.json clocks run x{f['stretch']} (official times)"
+        )
     print(
         f"race start {out['start']['local']} from {len(seen)} sightings (spread {out['start']['spread']} s); "
         f"vote without them: {out['start']['auto']['local']} ({out['start']['auto']['support']})"
@@ -317,6 +397,14 @@ def main() -> None:
             n = c["nearest"]
             extra = f"race t={c['raceT0']:7.1f}  nearest {n['rider']:<12} {n['residual']:+6.1f} s"
         print(f"{c['file']:<13} {when} {where} {c['kind']:<9} {extra}")
+        if c.get("fitPasses"):
+            print(
+                "    passes the camera (FIT): "
+                + ", ".join(
+                    f"{p['rider']} {p['at']:+.0f}s/{p['dist']:.0f}m"
+                    for p in c["fitPasses"]
+                )
+            )
         if args.verbose and c.get("arrivals"):
             print(
                 "    "

@@ -2,7 +2,7 @@
 // (Barlow Condensed, ink on dark glass, gold accents, rider colours). Every graphic is a
 // pure function of the frame: what to draw comes from the plan's cues, the numbers from
 // the race at that frame's race time.
-import { formatClock, formatGap, telemetryAt, timeAtDistance, gradeAt, ORDINAL } from './model.js';
+import { formatClock, formatGap, telemetryAt, timeAtDistance, interpolate, gradeAt, ORDINAL } from './model.js';
 import { gradeColor } from '../profile.js';
 
 export const INK = '#f4f2ea', DIM = '#a9b2a7', FAINT = '#6f786e', GOLD = '#ffd34d', RED = '#ff4d5a';
@@ -19,9 +19,10 @@ export function createOverlay(ctx, { W, H, model }) {
   const S = Math.min(W, H) / 1080; // one design unit
   const portrait = H > W;
   // Safe area: phone apps cover the top ~11% and the bottom ~20% of a 9:16 frame, and a column on the right.
-  const L = portrait
+  const L0 = portrait
     ? { x: 64 * S, top: 200 * S, bottom: H - 400 * S, right: W - 64 * S, rightLow: W - 150 * S }
     : { x: 80 * S, top: 64 * S, bottom: H - 64 * S, right: W - 80 * S, rightLow: W - 80 * S };
+  const L = { ...L0 }; // per frame: a 16:9 data layout narrows it to the column beside the phone clip
   const { riders } = model;
 
   const font = (w, px) => `${w} ${Math.round(px * S)}px ${FONT}`;
@@ -118,8 +119,8 @@ export function createOverlay(ctx, { W, H, model }) {
       if (a <= 0 || t == null) return;
       const r = riders[i], order = model.orderAt(t), rank = order.indexOf(i) + 1, fin = t >= r.finish;
       const tel = telemetryAt(r.samples, t), d = model.distance(i, t);
-      const w = portrait ? W - 2 * L.x : 760 * S, h = 210 * S;
-      const x = c.x ?? L.x, y0 = c.y ?? (portrait ? L.top + 170 * S : L.top + 160 * S);
+      const w = Math.min(portrait ? W - 2 * L.x : 760 * S, L.right - L.x), h = 210 * S;
+      const x = c.x ?? L.x, y0 = c.y != null ? c.y * H : (portrait ? L.top + 170 * S : L.top + 160 * S);
       const y = y0 + (1 - env(e).i) * 30 * S;
       ctx.save(); ctx.globalAlpha = a;
       panel(x, y, w, h, { accent: r.color });
@@ -188,8 +189,8 @@ export function createOverlay(ctx, { W, H, model }) {
       const a = vis(e, 0.5, 0.35), t = e.t;
       if (a <= 0 || t == null) return;
       const prof = model.profile, len = model.len;
-      const w = c.w ?? (portrait ? W - 2 * L.x : 1100 * S), h = (c.h ?? 170) * S;
-      const x = c.x ?? (portrait ? L.x : (W - w) / 2), y = (c.y ?? (portrait ? L.bottom - h - 20 * S : L.bottom - h)) + (1 - env(e).i) * 40 * S;
+      const w = c.w ?? Math.min(portrait ? W - 2 * L.x : 1100 * S, L.right - L.x), h = (c.h ?? 170) * S;
+      const x = c.x ?? (portrait || L.area ? L.x : (W - w) / 2), y = (c.y != null ? c.y * H : (portrait ? L.bottom - h - 20 * S : L.bottom - h)) + (1 - env(e).i) * 40 * S;
       const lo = Math.min(...prof.map(p => p.ele)), hi = Math.max(...prof.map(p => p.ele));
       const top = y + 44 * S, bot = y + h - 30 * S;
       const X = d => x + 20 * S + d / len * (w - 40 * S), E = el => bot - (el - lo) / (hi - lo) * (bot - top);
@@ -267,6 +268,101 @@ export function createOverlay(ctx, { W, H, model }) {
       ctx.restore();
     },
 
+    // A data callout: a rider's number, counted up as it lands (441 W, 196 BPM), with what it means.
+    stat(c, e) {
+      const k = env(e, 0.35, 0.3), a = Math.min(k.i, k.o);
+      if (a <= 0) return;
+      const r = c.rider != null ? riders[c.rider] : null, color = c.color ?? GOLD;
+      const u = easeOut(clamp01(e.since / (c.count ?? 0.7)));
+      const value = typeof c.value === 'number' ? (c.decimals ? (c.value * u).toFixed(c.decimals) : String(Math.round(c.value * u))) : c.value;
+      const big = c.px ?? 150, unitPx = Math.round(big * 0.34);
+      const vw = measure(typeof c.value === 'number' ? (c.decimals ? c.value.toFixed(c.decimals) : String(Math.round(c.value))) : c.value, 700, big);
+      const head = r ? r.name.toUpperCase() : (c.head ?? '').toUpperCase();
+      const w = Math.max(vw + measure(c.unit ?? '', 700, unitPx) + 90 * S, measure(c.label ?? '', 600, 26, 0.16) + 70 * S, measure(head, 700, 34, 0.04) + 120 * S);
+      const h = (big * 1.0 + 150) * S;
+      const x = c.x ?? L.x, y = (c.y != null ? c.y * H : (portrait ? L.bottom - h - 300 * S : L.bottom - h - 220 * S)) + (1 - k.i) * 30 * S;
+      ctx.save(); ctx.globalAlpha = a;
+      panel(x, y, w, h, { accent: r?.color ?? color });
+      if (r) dot(x + 50 * S, y + 50 * S, 20 * S, r.color, r.letter);
+      text(head, x + (r ? 82 : 34) * S, y + 62 * S, { px: 34, spacing: 0.04 });
+      const vy = y + 62 * S + big * 0.92 * S;
+      num(value, x + 32 * S, vy, { px: big, color });
+      text(c.unit ?? '', x + 32 * S + vw + 12 * S, vy, { px: unitPx, color });
+      text((c.label ?? '').toUpperCase(), x + 34 * S, y + h - 30 * S, { w: 600, px: 26, color: DIM, spacing: 0.16 });
+      ctx.restore();
+    },
+
+    // Two riders, one number, side by side at the same moment (same road, different hearts).
+    duel(c, e) {
+      const k = env(e, 0.4, 0.3), a = Math.min(k.i, k.o), t = e.t;
+      if (a <= 0 || t == null) return;
+      const key = c.metric ?? 'hr', unit = key === 'hr' ? 'BPM' : key === 'speed' ? 'KM/H' : 'W';
+      const w = Math.min(portrait ? W - 2 * L.x : 760 * S, L.right - L.x), rowH = 96 * S, h = 74 * S + rowH * c.riders.length;
+      const x = c.x ?? L.x, y = (c.y != null ? c.y * H : (portrait ? L.bottom - h - 300 * S : L.bottom - h - 220 * S)) + (1 - k.i) * 30 * S;
+      ctx.save(); ctx.globalAlpha = a;
+      panel(x, y, w, h);
+      text((c.title ?? (key === 'hr' ? 'HEART RATE' : 'POWER')).toUpperCase(), x + 30 * S, y + 46 * S, { w: 600, px: 22, color: GOLD, spacing: 0.22 });
+      c.riders.forEach((i, n) => {
+        const r = riders[i], ry = y + 74 * S + n * rowH, u = easeOut(clamp01((e.since - 0.12 * n) / 0.7));
+        const v = interpolate(r.samples, t, key);
+        if (n) { ctx.fillStyle = LINE; ctx.fillRect(x + 30 * S, ry, w - 60 * S, 1.5 * S); }
+        dot(x + 54 * S, ry + rowH / 2, 22 * S, r.color, r.letter);
+        text(r.name.toUpperCase(), x + 90 * S, ry + rowH / 2 + 13 * S, { px: 38, spacing: 0.03 });
+        const uw = measure(unit, 700, 30);
+        text(unit, x + w - 30 * S, ry + rowH / 2 + 22 * S, { px: 30, color: c.colors?.[n] ?? DIM, align: 'right' });
+        num(v == null ? '—' : String(Math.round(v * u)), x + w - 40 * S - uw, ry + rowH / 2 + 24 * S, { px: 74, color: c.colors?.[n] ?? INK, align: 'right' });
+      });
+      ctx.restore();
+    },
+
+    // A live telemetry trace: one rider's power or heart rate over a stretch of the race, drawn up to
+    // the race time on screen, the number now in big type, a highlighted window (the attack's 30 s).
+    trace(c, e) {
+      const a = vis(e, 0.4, 0.3), t = e.t;
+      if (a <= 0 || t == null) return;
+      const r = riders[c.rider], key = c.metric ?? 'watts', [t0, t1] = c.window;
+      const pts = [];
+      for (let s = t0; s <= t1; s += 2) { const v = interpolate(r.samples, s, key); if (v != null) pts.push([s, v]); }
+      if (pts.length < 2) return;
+      const lo = Math.min(...pts.map(p => p[1])), hi = Math.max(...pts.map(p => p[1]));
+      const w = c.w ?? (L.right - L.x), h = (c.h ?? 250) * S;
+      const x = c.x ?? L.x, y = (c.y != null ? c.y * H : (portrait ? L.bottom - h - 40 * S : L.bottom - h)) + (1 - env(e, 0.4, 0.3).i) * 30 * S;
+      const left = x + 28 * S, right = x + w - 28 * S, top = y + 92 * S, bot = y + h - 26 * S;
+      const X = s => left + (s - t0) / (t1 - t0) * (right - left), Y = v => bot - (v - lo) / Math.max(1, hi - lo) * (bot - top);
+      const now = Math.max(t0, Math.min(t1, t)), color = c.color ?? r.color;
+      ctx.save(); ctx.globalAlpha = a;
+      panel(x, y, w, h, { accent: r.color });
+      dot(x + 46 * S, y + 46 * S, 18 * S, r.color, r.letter);
+      text(r.name.toUpperCase(), x + 76 * S, y + 56 * S, { px: 30, spacing: 0.04 });
+      text((c.label ?? (key === 'hr' ? 'HEART RATE' : 'POWER')).toUpperCase(), x + 76 * S, y + 82 * S, { w: 600, px: 19, color: DIM, spacing: 0.16 });
+      const cur = interpolate(r.samples, now, key);
+      const unit = key === 'hr' ? 'BPM' : key === 'speed' ? 'KM/H' : 'W';
+      const uw = measure(unit, 700, 28);
+      text(unit, right, y + 74 * S, { px: 28, color, align: 'right' });
+      num(cur == null ? '—' : String(Math.round(cur)), right - uw - 8 * S, y + 74 * S, { px: 64, color, align: 'right' });
+      // highlight window
+      if (c.band) {
+        const [b0, b1] = c.band;
+        if (now >= b0) {
+          const bx0 = X(b0), bx1 = X(Math.min(now, b1));
+          ctx.fillStyle = 'rgba(255,211,77,0.16)'; ctx.fillRect(bx0, top - 8 * S, bx1 - bx0, bot - top + 8 * S);
+          if (c.bandLabel && now >= b1) text(c.bandLabel.toUpperCase(), (bx0 + X(b1)) / 2, top - 14 * S, { w: 700, px: 22, color: GOLD, align: 'center', spacing: 0.08 });
+        }
+      }
+      // the trace up to now
+      const drawn = pts.filter(p => p[0] <= now);
+      if (drawn.length > 1) {
+        ctx.beginPath(); drawn.forEach((p, k2) => k2 ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+        ctx.lineTo(X(drawn.at(-1)[0]), bot); ctx.lineTo(X(drawn[0][0]), bot); ctx.closePath();
+        const g = ctx.createLinearGradient(0, top, 0, bot); g.addColorStop(0, `${color}55`); g.addColorStop(1, `${color}00`);
+        ctx.fillStyle = g; ctx.fill();
+        ctx.beginPath(); drawn.forEach((p, k2) => k2 ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+        ctx.strokeStyle = color; ctx.lineWidth = 4 * S; ctx.lineJoin = 'round'; ctx.stroke();
+        if (cur != null) { ctx.beginPath(); ctx.arc(X(now), Y(cur), 8 * S, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
+      }
+      ctx.restore();
+    },
+
     // A finisher caption over real footage: the place in big gold figures, the name, the gap and the time.
     finisher(c, e) {
       const a = vis(e, 0.35, 0.3);
@@ -295,12 +391,13 @@ export function createOverlay(ctx, { W, H, model }) {
     stamp(c, e) {
       const a = vis(e, 0.3, 0.25);
       if (a <= 0) return;
-      const x = L.x, y = c.y ?? (portrait ? L.top : L.top);
-      ctx.save(); ctx.globalAlpha = a;
       const parts = c.parts; // [['REAL', gold], ['12:04:29'], ['KM 4.2']]
-      let cx = x;
       const h = 48 * S;
       const total = parts.reduce((s, p) => s + measure(p[0], 700, 26, 0.12) + 34 * S, 0);
+      // top right, clear of the race bug on the left
+      const x = c.x ?? L.right - total - 10 * S, y = c.y ?? L.top;
+      let cx = x;
+      ctx.save(); ctx.globalAlpha = a;
       panel(x, y, total + 10 * S, h, { r: 12, fill: 'rgba(8,10,9,0.72)' });
       cx += 18 * S;
       parts.forEach(([s, color]) => { cx += text(s, cx, y + 33 * S, { px: 26, color: color ?? INK, spacing: 0.12 }) + 34 * S; });
@@ -458,6 +555,7 @@ export function createOverlay(ctx, { W, H, model }) {
 
   return {
     S, L,
+    setArea(a) { Object.assign(L, L0, a ?? {}, { area: !!a }); },
     draw(cue, envData) { const fn = G[cue.type]; if (!fn) throw new Error(`unknown overlay ${cue.type}`); fn(cue, envData); },
   };
 }

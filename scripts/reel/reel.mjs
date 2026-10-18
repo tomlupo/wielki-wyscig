@@ -47,6 +47,11 @@ function encode(framesDir, audio, out, { fps, preview }) {
 mkdirSync(WORK, { recursive: true });
 const t0 = Date.now();
 
+step('The riders\' FIT rides on the wall clock');
+const rides = existsSync(`${ROOT}/rides`) ? readdirSync(`${ROOT}/rides`).filter(f => f.endsWith('.fit')) : [];
+if (rides.length) sh('uv', ['run', '--quiet', 'scripts/reel/tracks.py']);
+else log('  no rides/*.fit: the clock comes from the clips and the col sightings alone');
+
 step('Sync the clips to the race clock');
 sh('uv', ['run', '--quiet', 'scripts/reel/sync.py']);
 

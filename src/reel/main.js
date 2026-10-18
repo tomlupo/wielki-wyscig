@@ -159,6 +159,26 @@ async function boot() {
       g.lineWidth = 3; g.strokeStyle = 'rgba(255,211,77,0.9)'; g.beginPath(); g.roundRect(px, py, pw, ph, 22); g.stroke();
       return;
     }
+    if (shot.fit === 'bg') { // real footage as a soft backdrop for a full-screen graphic
+      g.save(); g.filter = 'blur(26px) saturate(1.1)';
+      drawCover(g, ia, ib, mix, -50, -50, W + 100, H + 100, zoom * 1.06, shot.focal);
+      g.restore();
+      return;
+    }
+    if (shot.fit === 'data') { // 16:9: the phone clip in a panel on the left over its own blurred footage, the data beside it
+      g.save(); g.filter = 'blur(36px) brightness(0.42) saturate(1.15)';
+      drawCover(g, ia, null, 0, -60, -60, W + 120, H + 120, 1.12, shot.focal);
+      g.restore();
+      const { x: px, y: py, w: pw, h: ph } = shot.panel;
+      g.save();
+      g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 50; g.shadowOffsetY = 10;
+      g.beginPath(); g.roundRect(px, py, pw, ph, 20); g.fillStyle = '#000'; g.fill();
+      g.shadowColor = 'transparent'; g.clip();
+      drawCover(g, ia, ib, mix, px, py, pw, ph, zoom, shot.focal);
+      g.restore();
+      g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,0.16)'; g.beginPath(); g.roundRect(px, py, pw, ph, 20); g.stroke();
+      return;
+    }
     if (shot.fit === 'blur') {
       g.save(); g.filter = 'blur(40px) brightness(0.55) saturate(1.2)';
       drawCover(g, ia, null, 0, -60, -60, W + 120, H + 120, 1.1, shot.focal);
@@ -259,6 +279,8 @@ async function boot() {
       blend(B.enter ?? 'fade', layers[0], layers[1], p);
     }
     if (!plan.raw) finish(f);
+    const top = live.at(-1);
+    overlay.setArea(top?.fit === 'data' ? { x: top.panel.x + top.panel.w + 64 * overlay.S, right: W - 72 * overlay.S } : null);
     for (const cue of plan.cues) if (f >= cue.from && f < cue.to) overlay.draw(cue, cueEnv(cue, f));
     // global fades
     for (const fade of plan.fades ?? []) if (f >= fade.from && f < fade.to) {

@@ -1,7 +1,16 @@
 {
  "start": {
-  "epoch": 1792230510.37,
-  "utcOffset": "+0200"
+  "epoch": 1792230512.25,
+  "utcOffset": "+0200",
+  "fit": {
+   "local": "11:49:18",
+   "epoch": 1792230558,
+   "spread": [
+    -7,
+    1
+   ],
+   "stretch": 1.0275
+  }
  },
  "clips": [
   {
@@ -18,7 +27,7 @@
    "offRoad": 17305.6,
    "altDelta": null,
    "onClimb": false,
-   "raceT0": -5233.37,
+   "raceT0": -5425.31,
    "kind": "off-route"
   },
   {
@@ -35,7 +44,7 @@
    "offRoad": 17251.7,
    "altDelta": null,
    "onClimb": false,
-   "raceT0": -5225.37,
+   "raceT0": -5417.08,
    "kind": "off-route"
   },
   {
@@ -52,8 +61,45 @@
    "offRoad": 372.9,
    "altDelta": null,
    "onClimb": false,
-   "raceT0": -76.37,
-   "kind": "off-route"
+   "raceT0": -126.54,
+   "kind": "off-route",
+   "fitPasses": [
+    {
+     "rider": "rafi",
+     "at": 6,
+     "dist": 15.3
+    },
+    {
+     "rider": "el-szczupak",
+     "at": 8,
+     "dist": 13.8
+    },
+    {
+     "rider": "el-lobo",
+     "at": 11,
+     "dist": 12.8
+    },
+    {
+     "rider": "krzys",
+     "at": 11,
+     "dist": 15.1
+    },
+    {
+     "rider": "karol",
+     "at": 11,
+     "dist": 14.4
+    },
+    {
+     "rider": "el-halcon",
+     "at": 14,
+     "dist": 14.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 15,
+     "dist": 14.2
+    }
+   ]
   },
   {
    "file": "IMG_7772.MOV",
@@ -69,8 +115,35 @@
    "offRoad": 238.7,
    "altDelta": null,
    "onClimb": false,
-   "raceT0": -11.37,
-   "kind": "off-route"
+   "raceT0": -60.21,
+   "kind": "off-route",
+   "fitPasses": [
+    {
+     "rider": "el-lobo",
+     "at": -5,
+     "dist": 33.1
+    },
+    {
+     "rider": "los-locos",
+     "at": -5,
+     "dist": 21
+    },
+    {
+     "rider": "krzys",
+     "at": -5,
+     "dist": 34.7
+    },
+    {
+     "rider": "el-halcon",
+     "at": -5,
+     "dist": 27.5
+    },
+    {
+     "rider": "karol",
+     "at": -5,
+     "dist": 30.3
+    }
+   ]
   },
   {
    "file": "IMG_7774.MOV",
@@ -86,8 +159,45 @@
    "offRoad": 4.9,
    "altDelta": 8.1,
    "onClimb": true,
-   "raceT0": 201.63,
-   "kind": "riding"
+   "raceT0": 158.63,
+   "kind": "riding",
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 0,
+     "dist": 21.5
+    },
+    {
+     "rider": "los-locos",
+     "at": 4,
+     "dist": 7.9
+    },
+    {
+     "rider": "el-halcon",
+     "at": 4,
+     "dist": 6.1
+    },
+    {
+     "rider": "krzys",
+     "at": 20,
+     "dist": 7.5
+    },
+    {
+     "rider": "el-lobo",
+     "at": 21,
+     "dist": 35.6
+    },
+    {
+     "rider": "rafi",
+     "at": 21,
+     "dist": 23.5
+    },
+    {
+     "rider": "karol",
+     "at": 21,
+     "dist": 26.3
+    }
+   ]
   },
   {
    "file": "IMG_7778.MOV",
@@ -103,8 +213,25 @@
    "offRoad": 0.7,
    "altDelta": -2.8,
    "onClimb": true,
-   "raceT0": 598.63,
-   "kind": "riding"
+   "raceT0": 567.2,
+   "kind": "riding",
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 7,
+     "dist": 2.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 14,
+     "dist": 6.6
+    },
+    {
+     "rider": "el-halcon",
+     "at": 14,
+     "dist": 6.1
+    }
+   ]
   },
   {
    "file": "IMG_7782.MOV",
@@ -120,8 +247,25 @@
    "offRoad": 3.2,
    "altDelta": 1.7,
    "onClimb": true,
-   "raceT0": 958.63,
-   "kind": "riding"
+   "raceT0": 937.64,
+   "kind": "riding",
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": -1,
+     "dist": 4.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 7,
+     "dist": 4.8
+    },
+    {
+     "rider": "el-halcon",
+     "at": 7,
+     "dist": 3.4
+    }
+   ]
   },
   {
    "file": "IMG_7786.MOV",
@@ -137,8 +281,25 @@
    "offRoad": 16.5,
    "altDelta": 11.3,
    "onClimb": true,
-   "raceT0": 1315.63,
-   "kind": "riding"
+   "raceT0": 1305.05,
+   "kind": "riding",
+   "fitPasses": [
+    {
+     "rider": "los-locos",
+     "at": -5,
+     "dist": 22.4
+    },
+    {
+     "rider": "el-szczupak",
+     "at": -5,
+     "dist": 15.9
+    },
+    {
+     "rider": "el-halcon",
+     "at": 11,
+     "dist": 37
+    }
+   ]
   },
   {
    "file": "IMG_7787.MOV",
@@ -154,8 +315,28 @@
    "offRoad": 1,
    "altDelta": -4.9,
    "onClimb": true,
-   "raceT0": 1339.63,
-   "kind": "riding"
+   "raceT0": 1331.36,
+   "kind": "riding",
+   "sightings": [
+    {
+     "rider": "el-halcon",
+     "at": 17,
+     "offsetFromStart": 18.7,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-halcon",
+     "at": 12,
+     "dist": 0.8
+    },
+    {
+     "rider": "los-locos",
+     "at": 23,
+     "dist": 32.7
+    }
+   ]
   },
   {
    "file": "IMG_7789.MOV",
@@ -171,8 +352,15 @@
    "offRoad": 0.8,
    "altDelta": 0.3,
    "onClimb": true,
-   "raceT0": 1532.63,
-   "kind": "riding"
+   "raceT0": 1527.52,
+   "kind": "riding",
+   "fitPasses": [
+    {
+     "rider": "el-halcon",
+     "at": 17,
+     "dist": 4.6
+    }
+   ]
   },
   {
    "file": "IMG_7792.MOV",
@@ -188,13 +376,21 @@
    "offRoad": 16.4,
    "altDelta": -1.2,
    "onClimb": true,
-   "raceT0": 1674.31,
+   "raceT0": 1672.74,
    "kind": "summit",
    "sightings": [
     {
      "rider": "el-szczupak",
      "at": 3,
-     "offsetFromStart": -7.7
+     "offsetFromStart": -9.6,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 12,
+     "dist": 16.9
     }
    ]
   },
@@ -212,13 +408,21 @@
    "offRoad": 0.4,
    "altDelta": -1,
    "onClimb": true,
-   "raceT0": 1796.06,
+   "raceT0": 1799.68,
    "kind": "summit",
    "sightings": [
     {
      "rider": "krzys",
      "at": 17.3,
-     "offsetFromStart": 1.6
+     "offsetFromStart": -0.3,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "krzys",
+     "at": 22,
+     "dist": 0.3
     }
    ]
   },
@@ -236,13 +440,21 @@
    "offRoad": 1.1,
    "altDelta": -0.2,
    "onClimb": true,
-   "raceT0": 1855.88,
+   "raceT0": 1853.39,
    "kind": "summit",
    "sightings": [
     {
      "rider": "el-lobo",
      "at": 10.8,
-     "offsetFromStart": 7.8
+     "offsetFromStart": 5.9,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-lobo",
+     "at": 18,
+     "dist": 2.9
     }
    ]
   },
@@ -260,18 +472,32 @@
    "offRoad": 1.1,
    "altDelta": 5.1,
    "onClimb": true,
-   "raceT0": 1974.14,
+   "raceT0": 1975.61,
    "kind": "summit",
    "sightings": [
     {
-     "rider": "karol",
+     "rider": "rafi",
      "at": 0.8,
-     "offsetFromStart": 0
+     "offsetFromStart": -5.1,
+     "fit": true
     },
     {
-     "rider": "rafi",
+     "rider": "karol",
      "at": 3,
-     "offsetFromStart": -1
+     "offsetFromStart": 0.3,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "rafi",
+     "at": 5,
+     "dist": 2.5
+    },
+    {
+     "rider": "karol",
+     "at": 6,
+     "dist": 3.8
     }
    ]
   },
@@ -289,7 +515,7 @@
    "offRoad": null,
    "altDelta": null,
    "onClimb": false,
-   "raceT0": 4545.63,
+   "raceT0": 4622.86,
    "kind": "off-route"
   }
  ]

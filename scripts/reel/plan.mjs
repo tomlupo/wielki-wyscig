@@ -11,6 +11,7 @@ import { mapFrames } from './timing.mjs';
 import { ROOT, WORK, MUSIC } from './paths.mjs';
 
 export const FORMATS = { '9x16': [1080, 1920], '16x9': [1920, 1080] };
+const DATA_CUES = new Set(['stat', 'trace', 'duel', 'rider', 'standings', 'profile', 'finisher', 'event']);
 
 export function loadInputs() {
   const race = JSON.parse(readFileSync(`${ROOT}/data/race.json`, 'utf8'));
@@ -97,13 +98,15 @@ export function makePlan({ format = '9x16', fps = 30, preview = false, inputs = 
       (clipsUsed[s.file] ??= { file: s.file, fps: c.fps, hdr: c.hdr, dir: dirName, ranges: [] }).ranges.push([shot.first, shot.last]);
       // race time over the clip, from the sync (none for clips off the climb)
       shot.raceT = c.raceT0 != null && c.kind !== 'off-route' ? shot.src.map(v => +(c.raceT0 + v).toFixed(3)) : null;
-      if (portrait) shot.fit = 'cover';
-      else if (s.twin && shot.raceT) {
-        shot.fit = 'panel'; shot.panel = { margin: panelMargin }; shot.inset = panelW + 2 * panelMargin;
-        shot.cam = s.twin; shot.t = shot.raceT.map(v => Math.max(0, Math.min(model.duration, v)));
-        shot.labels = 'all';
-      } else shot.fit = s.fit ?? 'blur';
-      if (s.fit && portrait) shot.fit = s.fit;
+      // 9:16: the phone's own frame, full bleed. 16:9: a clip that carries data sits in a panel with the
+      // graphics beside it ('data'); one without fills the frame over its own blurred footage ('blur').
+      const dataCue = (s.cues ?? []).some(c => DATA_CUES.has(c.type));
+      if (s.fit === 'bg') shot.fit = 'bg';
+      else if (portrait) shot.fit = s.fit ?? 'cover';
+      else if ((s.fit16 ?? (dataCue ? 'data' : 'blur')) === 'data') {
+        shot.fit = 'data';
+        shot.panel = { x: Math.round(84 * scale), y: panelMargin, w: panelW, h: H - 2 * panelMargin };
+      } else shot.fit = 'blur';
     } else shot.color = s.color ?? '#0b0f0d';
     return shot;
   });

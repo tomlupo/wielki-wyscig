@@ -1,5 +1,5 @@
 {
-  "_": "Editor's log of the phone footage (data/videos), from contact sheets of every clip. `use`: usable [in, out] seconds. `sightings`: a rider passing the camera at clip second `at`, identified by the order and spacing of summit arrivals against race.json (sync.py refines the race clock with them). Mid-climb riders are not named: two riders in red helmets on black bikes cannot be told apart, so no tag claims who they are.",
+  "_": "Editor's log of the phone footage (data/videos), from contact sheets of every clip. `use`: usable [in, out] seconds. `sightings`: a rider passing the camera at clip second `at`, identified by the order and spacing of summit arrivals against race.json and confirmed by the riders' FIT tracks (tracks.py): sync.py takes the exact second from here and the race clock from the FIT rides. A rider is named only where the FIT track and the picture agree; elsewhere (several riders in red helmets on black bikes) no caption claims who is on screen.",
   "IMG_5363.MOV": { "what": "Morning roll-out on the flat (10:21): a red-helmet rider rides past on the left", "use": [[0.4, 3.6]] },
   "IMG_5364.MOV": { "what": "Roll-out on farm roads: the group strung out ahead, the filmer's shadow on the fence", "use": [[0.0, 3.6], [6.8, 10.0]] },
   "IMG_7771.MOV": { "what": "Caimari village: the group rolls through between yellow houses and green shutters, passing the camera", "use": [[1.5, 6.5], [8.0, 12.0]] },
@@ -8,11 +8,11 @@
   "IMG_7778.MOV": { "what": "Roadside under olive trees: four riders come up the road and pass close", "use": [[1.5, 7.6]] },
   "IMG_7782.MOV": { "what": "The stone-wall balcony: riding up the line of riders, mountains and big clouds behind", "use": [[0.0, 7.5], [8.0, 16.0], [16.0, 21.8]] },
   "IMG_7786.MOV": { "what": "On the wheel of a red-helmet rider, close", "use": [[0.0, 6.6]] },
-  "IMG_7787.MOV": { "what": "Roadside: a pair climbs out of the valley road; the red-helmet rider passes in profile", "use": [[6.0, 18.0]] },
+  "IMG_7787.MOV": { "what": "Roadside: a pair climbs out of the valley road; El Halcon (red helmet) passes in profile, alone in front after his attack (FIT: the only one of the seven within 150 m)", "use": [[6.0, 18.0]], "sightings": [{ "at": 17.0, "rider": "el-halcon" }] },
   "IMG_7789.MOV": { "what": "Roadside under pines: a red-helmet rider comes through, a car behind the riders", "use": [[0.0, 4.0], [5.5, 10.5]] },
   "IMG_7792.MOV": { "what": "The last hairpin below the col: El Szczupak rises out of it, passes, rides to the top", "use": [[0.5, 6.8]], "sightings": [{ "at": 3.0, "rider": "el-szczupak" }] },
   "IMG_7793.MOV": { "what": "The last hairpin: a passer-by waves, then Krzys climbs out of the bend and passes with a grin", "use": [[0.0, 1.6], [12.0, 21.5]], "sightings": [{ "at": 17.3, "rider": "krzys" }] },
   "IMG_7794.MOV": { "what": "The last hairpin: El Lobo crosses it, passes, a whip pan, the COLL DE SA BATALLA 576 m sign", "use": [[6.0, 18.0]], "sightings": [{ "at": 10.8, "rider": "el-lobo" }] },
-  "IMG_7795.MOV": { "what": "The last two: Karol, then Rafi two seconds behind, to the summit sign", "use": [[0.0, 6.6]], "sightings": [{ "at": 0.8, "rider": "karol" }, { "at": 3.0, "rider": "rafi" }] },
+  "IMG_7795.MOV": { "what": "The last two: Rafi, then Karol two seconds behind, to the summit sign (FIT: Rafi was 22 m ahead on the road; Karol's official time is still 3 s faster, he started 6 s later)", "use": [[0.0, 6.6]], "sightings": [{ "at": 0.8, "rider": "rafi" }, { "at": 3.0, "rider": "karol" }] },
   "VMGY3907.MP4": { "what": "Selfie at the summit café after the climb, camera in hand", "use": [[0.0, 3.3]] }
 }

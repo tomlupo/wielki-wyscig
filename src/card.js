@@ -98,10 +98,10 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
     ctx.fillStyle = LINE; ctx.fillRect(P, y + rowH - 1, W, 1);
     ctx.fillStyle = row.rank === 1 ? GOLD : DIM; ctx.font = font(700, fs);
     ctx.fillText(String(row.rank), cols.rank, base);
-    ctx.fillStyle = row.rider.color;
-    ctx.beginPath(); ctx.arc(cols.rank + 56, mid, rowH * 0.32, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.font = font(700, Math.round(fs * 0.8)); ctx.textAlign = 'center';
-    ctx.fillText(row.rider.letter, cols.rank + 56, mid + fs * 0.29);
+    // the helmet colour: a dot, or a ring for the second of two riders with the same helmet
+    const rr = rowH * 0.32;
+    ctx.beginPath(); ctx.arc(cols.rank + 56, mid, row.rider.ring ? rr * 0.78 : rr, 0, Math.PI * 2);
+    if (row.rider.ring) { ctx.strokeStyle = row.rider.color; ctx.lineWidth = rr * 0.44; ctx.stroke(); } else { ctx.fillStyle = row.rider.color; ctx.fill(); }
     ctx.textAlign = 'left'; ctx.fillStyle = INK; ctx.font = font(600, fs);
     ctx.fillText(fit(ctx, row.rider.name.toUpperCase(), cols.time - 150 - cols.name), cols.name, base);
     ctx.textAlign = 'right';
@@ -156,9 +156,11 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
   ctx.beginPath(); ctx.moveTo(box.x, G(0)); ctx.lineTo(box.x + box.w, G(0)); ctx.stroke(); ctx.setLineDash([]);
   for (let k = rows.length - 1; k >= 0; k--) { // the winner drawn last, on top
     ctx.strokeStyle = rows[k].rider.color; ctx.lineWidth = k ? 4 : 5; ctx.lineJoin = 'round';
+    ctx.setLineDash(rows[k].rider.ring ? [14, 9] : []); // same helmet colour as another rider: dashed
     ctx.beginPath();
     ds.forEach((d, j) => j ? ctx.lineTo(X(d), G(lines[k][j])) : ctx.moveTo(X(d), G(lines[k][j])));
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.fillStyle = DIM; ctx.font = font(600, 22);
   for (let k = 1; k * 1000 < len; k++) ctx.fillText(`${k}`, X(k * 1000) - 5, box.y + box.h + 28);

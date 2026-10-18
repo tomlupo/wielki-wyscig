@@ -50,7 +50,8 @@ async function boot() {
   if (Math.abs(race.distanceM - terrain.route.at(-1)[3]) > 1) throw new Error('Race distance does not match this climb.');
 
   // ---- race model ---------------------------------------------------------
-  const riders = race.riders.map((r, i) => ({ ...r, index: i, letter: String.fromCharCode(65 + i), finish: r.samples.at(-1).t }));
+  // Riders are told apart by helmet colour; where two share one, the later rider is drawn as a ring.
+  const riders = race.riders.map((r, i) => ({ ...r, index: i, ring: race.riders.slice(0, i).some(o => o.color.toLowerCase() === r.color.toLowerCase()), finish: r.samples.at(-1).t }));
   const duration = Math.max(...riders.map(r => r.finish));
   // The official clock starts before the 3D road (DATA.md, clockOffset): every time shown is on it.
   const clockOffset = race.clockOffset ?? 0, shown = t => formatClock(t + clockOffset + 1e-6);
@@ -91,7 +92,7 @@ async function boot() {
   const board = $('board');
   const rows = riders.map((r, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter">${r.letter}</b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
+    li.innerHTML = `<button style="--c:${r.color}"><span class="rank"></span><b class="letter${r.ring ? ' ring' : ''}"></b><span class="nm"></span><span class="gap"></span><span class="sens"></span><i class="prog"><i></i></i></button>`;
     li.querySelector('.nm').textContent = r.name;
     li.querySelector('button').addEventListener('click', () => followRider(i));
     board.append(li);
@@ -521,7 +522,7 @@ async function boot() {
       r.prog.style.transform = `scaleX(${row.d / len})`;
     });
     const me = byIndex[selected], tel = telemetryAt(riders[selected].samples, time), rider = riders[selected];
-    text('f-letter', rider.letter);
+    $('f-letter').classList.toggle('ring', rider.ring);
     text('f-name', rider.name);
     text('f-pos', me.finished ? `Finished P${me.rank} · ${shown(me.finish)}` : me.rank === 1 ? 'P1 · Leading' : `P${me.rank} · ${formatGap(me.gap)}`);
     text('f-togo', ((len - me.d) / 1000).toFixed(2));

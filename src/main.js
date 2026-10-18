@@ -206,7 +206,7 @@ async function boot() {
   let world = null, live = false, pageDrag = null;
   try {
     const { createWorld } = await worldModule;
-    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y) });
+    world = await createWorld({ container: $('stage'), labels: $('labels'), terrain, race: { ...race, riders }, onSelect: i => live && followRider(i), onPageDrag: (phase, y) => live && pageDrag?.(phase, y), keepOut: document.querySelector('.top') });
     world.onModeChange(mode => { if (!live) return; camMode = mode; syncCams(); pushState(); });
     world.onUserCamera(() => live && autoOff());
     await Promise.race([world.ready, new Promise(r => setTimeout(r, 6000))]);
@@ -255,7 +255,7 @@ async function boot() {
     auto = on;
     world.setCinematic(on);
     app.classList.toggle('auto', on); // letterbox bars while the director has the camera
-    if (on) cutTo(director.start(time, performance.now() / 1000));
+    if (on) cutTo(director.start(time, performance.now() / 1000, speed));
     syncCams();
     pushState(true);
   }

@@ -25,7 +25,7 @@ const SHOTS = {
 const POV_FOV = 55, MAP_FOV = 42;
 
 // Async so the build yields to the browser between heavy steps (keeps phones responsive).
-export async function createWorld({ container, labels, terrain, race, onSelect, onPageDrag }) {
+export async function createWorld({ container, labels, terrain, race, onSelect, onPageDrag, keepOut = null }) {
   const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
   const coarse = matchMedia('(pointer: coarse)').matches;
   const lite = coarse && (navigator.hardwareConcurrency || 8) <= 4; // a weak phone: lighter mesh, no bloom
@@ -640,7 +640,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   // ---- frame ----------------------------------------------------------------
   const currentD = race.riders.map(() => 0);
   const project = new THREE.Vector3(), trailP = new THREE.Vector3(), trailS = new THREE.Vector3();
-  let lastNow = performance.now(), slowFrames = 0, frames = 0, w = 1, h = 1, insetRight = 0, lastKey = '';
+  let lastNow = performance.now(), slowFrames = 0, frames = 0, w = 1, h = 1, insetRight = 0, lastKey = '', keepOutBottom = 0;
   const post = createPost(renderer, scene, camera, { quality: lite ? 'low' : 'high' });
   const sunAway = new THREE.Vector2(-SUN_DIR.x, -SUN_DIR.z).normalize();
 
@@ -656,13 +656,17 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     renderer.setSize(w, h, false);
     post.setSize(w, h);
     if (rig.mode === 'overview') overviewPose();
+    // The title block sits over the top of the canvas; place names under it would print over the title.
+    keepOutBottom = keepOut ? keepOut.getBoundingClientRect().bottom - container.getBoundingClientRect().top + 8 : 0;
   }
   // A portrait screen gets a taller field, so the horizontal framing stays close to landscape's.
   function applyFov() {
     camera.fov = fov * (aspect < 0.8 ? 1.3 : 1);
     camera.updateProjectionMatrix();
   }
-  new ResizeObserver(resize).observe(container);
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(container);
+  if (keepOut) resizeObserver.observe(keepOut);
   resize();
 
   function frame({ time, distances, playing, rate }) {
@@ -772,7 +776,8 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     });
     for (const m of marks) {
       project.copy(m.p).project(camera);
-      const visible = project.z < 1 && Math.abs(project.x) < 0.95 && Math.abs(project.y) < 0.95 && camera.position.distanceTo(m.p) > 250;
+      const visible = project.z < 1 && Math.abs(project.x) < 0.95 && Math.abs(project.y) < 0.95 && camera.position.distanceTo(m.p) > 250
+        && (-project.y * 0.5 + 0.5) * h > keepOutBottom;
       m.el.hidden = !visible;
       if (visible) m.el.style.transform = `translate3d(${(project.x * 0.5 + 0.5) * w}px,${(-project.y * 0.5 + 0.5) * h}px,0)`;
     }

@@ -93,7 +93,7 @@ export function buildRoad({ scene, roadPoint, roadDir, elevation, len, STEP, ROA
       out[k] = drop < 2.2 ? 0 : (bend > 1 / 45 && outside) || drop > 9 ? 2 : 1;
     }
     // runs shorter than 16 m are noise; gaps shorter than 12 m are closed
-    for (let k = 1; k < roadN - 3; k++) if (!out[k] && out[k - 1] && out[k - 1] === out[k + 2]) out[k] = out[k + 1] = out[k - 1];
+    for (let k = 1; k < roadN - 3; k++) if (!out[k] && !out[k + 1] && out[k - 1] && out[k - 1] === out[k + 2]) out[k] = out[k + 1] = out[k - 1];
     for (let k = 0; k < roadN;) {
       let e = k;
       while (e < roadN && out[e] === out[k]) e++;

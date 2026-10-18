@@ -34,9 +34,8 @@ GRID = 15.0  # m between height samples (the 5 m DEM is area-averaged onto it)
 TILE = 256.0  # m, corridor tile edge
 CORRIDOR = 170.0  # m either side of the road that gets 25 cm imagery
 TREE_REACH = 160.0  # m from the road that gets 3D trees
-ROAD_CLEAR = (
-    6.5  # m from the road centre kept free of trees (the canopy over the lane is cut)
-)
+# m from the road centre to the nearest crown edge: half the 6 m road, the wall, a little air
+ROAD_CLEAR = 4.4
 
 WCS = "https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=Elevacion4258_5&FORMAT=image/tiff"
 WMS = "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG:3857&FORMAT=image/jpeg"
@@ -280,9 +279,11 @@ def find_trees(t, tiles):
                 x = -f.width / 2 + i * TILE + (px + 0.5) / W * TILE
                 z = -f.depth / 2 + j * TILE + (py + 0.5) / H * TILE
                 trees.append((x, z, r, float(lum[py, px])))
+    if not trees:
+        raise RuntimeError("no tree crowns found: check the tiles")
     trees = np.array(trees)
     d = seg_dist(trees[:, 0], trees[:, 1], route)
-    keep = (d > ROAD_CLEAR) & (d < TREE_REACH)
+    keep = (d - trees[:, 2] > ROAD_CLEAR) & (d < TREE_REACH)  # the whole crown clears the road
     trees = trees[keep]
     print(f"trees: {len(trees)} within {TREE_REACH:g} m of the road", file=sys.stderr)
     return trees

@@ -86,6 +86,9 @@ export function createCorridor({ renderer, hi }) {
 export const corridorGLSL = `
   uniform sampler2D uTile[${SLOTS}]; uniform vec3 uTileXZ[${SLOTS}]; uniform float uTileSize;
   vec4 corridorColor(vec2 g) {
+  #if __VERSION__ < 300
+    return vec4(0.0); // WebGL1 has no textureGrad: the survey photo only
+  #else
     vec2 gx = dFdx(g) / uTileSize, gy = dFdy(g) / uTileSize;
     vec4 c = vec4(0.0);
     ${Array.from({ length: SLOTS }, (_, i) => `
@@ -94,4 +97,5 @@ export const corridorGLSL = `
       if (tu.x >= 0.0 && tu.y >= 0.0 && tu.x < 1.0 && tu.y < 1.0) c = vec4(textureGrad(uTile[${i}], tu, gx, gy).rgb, 1.0);
     }`).join('')}
     return c;
+  #endif
   }`;

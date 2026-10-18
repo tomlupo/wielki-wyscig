@@ -1,5 +1,5 @@
-// The ground: the measured DEM (IGN MDT05 on a 15 m grid) as the mesh, plus a relief map
-// baked once at 5 m — per-pixel normals (hillshade), cast sun shadow and ambient occlusion
+// The ground: the measured DEM (IGN MDT05 averaged onto a 15 m grid) as the mesh, plus a relief map
+// baked once, upsampled bicubically to 5 m — per-pixel normals (hillshade), cast sun shadow and ambient occlusion
 // in the valleys — so the hills read crisply from any distance. Along the road the survey
 // photo gives way to 25 cm tiles near the camera (corridor.js).
 import * as THREE from 'three';
@@ -139,7 +139,7 @@ export async function buildTerrain({ terrain, renderer, lite, phone, corridor })
           vec3 tex = texture2D(map, vMapUv).rgb;
           // the 25 cm tile here, if one is live, fading out before the ring of live tiles ends
           vec4 sharp = corridorColor(vGround.xz);
-          sharpK = sharp.a * (1.0 - smoothstep(900.0, 1300.0, camDist));
+          sharpK = sharp.a * (1.0 - smoothstep(550.0, 850.0, camDist)); // inside what 12 tiles cover, even on the hairpins
           tex = mix(tex, sharp.rgb, sharpK);
           // the clips' grade: natural colour, pale limestone, nothing pushed
           float lum = dot(tex, vec3(0.2126, 0.7152, 0.0722));

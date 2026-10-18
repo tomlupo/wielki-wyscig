@@ -11,7 +11,7 @@ import { createPost } from './post.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const RIDER_SCALE = 3; // riders are drawn 3× life size: they read from the moto, and do not tower over real-size trees
-const ROAD_LIFT = 1.6, ROAD_RADIUS = 3.1; // a 6 m road, as on the climb
+const ROAD_LIFT = 1.1, ROAD_RADIUS = 3.1; // a 6 m road, as on the climb; lifted a little over the 15 m mesh, skirts hide the rest
 // Camera framings: offsets of the follow rig around the rider (theta: around, 0 = behind;
 // phi: from vertical; fov: vertical degrees on a landscape screen, ×1.3 on a portrait one).
 // Wide and long-lens on purpose: the riders sit IN the landscape, their labels carry them.
@@ -56,10 +56,11 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   scene.add(ground);
   // The tile index and the trees arrive after the first picture: the race never waits for them.
   let trees = null, sceneDirty = false;
-  fetch('/corridor/index.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(index => {
+  fetch('/corridor/index.json').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(async index => {
     corridor.setIndex(index, width, depth);
-    trees = buildTrees({ index, terrain, elevation, lite, phone: coarse });
-    scene.add(trees.group);
+    const built = await buildTrees({ index, terrain, elevation, lite, phone: coarse });
+    scene.add(built.group);
+    trees = built;
     sceneDirty = true;
   }).catch(error => console.warn('corridor imagery unavailable', error));
   await breathe();

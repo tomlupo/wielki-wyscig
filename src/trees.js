@@ -26,22 +26,23 @@ function crownGeometry(detail, sy, seed) {
 const KINDS = [
   { // Aleppo pine: tall trunk, flat-topped crown
     crown: () => crownGeometry(1, 0.55, 1), unitH: 1.15, trunk: true,
-    height: r => 1.7 * r + 2.2, crownH: r => 1.25 * r, colors: [0x5a6a48, 0x637250, 0x526244, 0x6b7a55],
+    height: r => 1.7 * r + 2.2, crownH: r => 1.25 * r, colors: [0x1a2511, 0x202b14, 0x161f0f, 0x253217],
   },
   { // holm oak / olive: round crown close to the ground
     crown: () => crownGeometry(1, 0.8, 2), unitH: 1.7, trunk: false,
-    height: r => 1.7 * r + 1, crownH: r => 1.5 * r, colors: [0x6c7a50, 0x778457, 0x65724b, 0x8a9168],
+    height: r => 1.7 * r + 1, crownH: r => 1.5 * r, colors: [0x263214, 0x2f3b18, 0x212b12, 0x414823],
   },
   { // low scrub (lentisc, carritx)
     crown: () => crownGeometry(0, 0.6, 3), unitH: 1.3, trunk: false,
-    height: r => 1.1 * r, crownH: r => 1.1 * r, colors: [0x8f9070, 0x868a66, 0x9a9878],
+    height: r => 1.1 * r, crownH: r => 1.1 * r, colors: [0x464729, 0x3d4122, 0x525030],
   },
 ];
 
-export function buildTrees({ index, terrain, elevation, lite, phone }) {
+export async function buildTrees({ index, terrain, elevation, lite, phone }) {
+  const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
   const T = index.tile, { width, depth } = terrain;
   const group = new THREE.Group();
-  const stride = phone ? 2 : 1; // a phone draws every second tree
+  const stride = lite ? 3 : phone ? 2 : 1; // a phone draws every second tree, a weak one every third
   // Bucket by corridor tile.
   const buckets = new Map();
   const t = index.trees;
@@ -62,6 +63,7 @@ export function buildTrees({ index, terrain, elevation, lite, phone }) {
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const chunks = [];
   for (const [key, lists] of buckets) {
+    if (chunks.length % 6 === 5) await breathe(); // builds while the race plays
     const [i, j] = key.split('_').map(Number), centre = new THREE.Vector3(-width / 2 + (i + 0.5) * T, 0, -depth / 2 + (j + 0.5) * T);
     centre.y = elevation(centre.x, centre.z);
     const meshes = [];
@@ -78,7 +80,7 @@ export function buildTrees({ index, terrain, elevation, lite, phone }) {
         q.setFromEuler(new THREE.Euler((rand() - 0.5) * 0.16, rand() * Math.PI * 2, (rand() - 0.5) * 0.16));
         pos.set(x, y + h - ch * 0.5, z); scl.set(r, ch / K.unitH, r * (0.85 + 0.3 * rand()));
         crown.setMatrixAt(s, m4.compose(pos, q, scl));
-        col.setHex(K.colors[(rand() * K.colors.length) | 0]).convertSRGBToLinear();
+        col.setHex(K.colors[(rand() * K.colors.length) | 0]); // setHex already converts sRGB to linear
         crown.setColorAt(s, col);
         if (trunk) {
           pos.set(x, y, z); scl.set(r * 0.28, h - ch * 0.6, r * 0.28);

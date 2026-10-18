@@ -105,9 +105,9 @@ async function boot() {
     });
     const S = overlay.S;
     // A bunch would stack its labels into an unreadable pile: the first label of a pile stands for it with "+N"
-    // (the focus rider claims a place first, then riders by race position).
+    // (the shot's own rider claims a place first, then named riders, then riders by race position).
     const order = model.orderAt(c.t);
-    items.sort((a, b) => b.focus - a.focus || order.indexOf(a.i) - order.indexOf(b.i));
+    items.sort((a, b) => (b.i === shot.focus) - (a.i === shot.focus) || b.focus - a.focus || order.indexOf(a.i) - order.indexOf(b.i));
     const placed = [];
     g.save(); g.font = `700 ${Math.round(26 * S)}px "Barlow Condensed"`;
     for (const it of items) {

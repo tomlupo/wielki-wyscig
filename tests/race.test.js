@@ -26,3 +26,13 @@ test('published race data (data/race.json) passes the v1 contract', () => {
   const live = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
   assert.doesNotThrow(() => validateRace(live));
 });
+
+// The replay must show the official (Strava) segment times exactly: finish + clockOffset.
+test('the recorded race finishes every rider at their official time on the shown clock', async () => {
+  const { formatClock } = await import('../src/race.js');
+  const real = validateRace(JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url))));
+  const official = real.riders.filter(r => r.officialTime != null);
+  assert.ok(official.length >= 6);
+  for (const r of official) assert.equal(formatClock(r.samples.at(-1).t + real.clockOffset + 1e-6), formatClock(r.officialTime), r.name);
+  assert.throws(() => validateRace({ ...real, clockOffset: -1 }), /clock offset/);
+});

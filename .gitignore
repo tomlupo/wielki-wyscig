@@ -3,6 +3,5 @@ dist/
 .vercel/
 .env*
 !.env.example
-rides/
 data/videos/
 .cache/

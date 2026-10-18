@@ -261,7 +261,7 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
     const label = document.createElement('button');
     label.className = 'rlabel';
     label.style.setProperty('--c', data.color);
-    label.innerHTML = `<b>${data.letter}</b><span></span><em hidden></em>`;
+    label.innerHTML = `<b${data.ring ? ' class="ring"' : ''}></b><span></span><em hidden></em>`;
     label.querySelector('span').textContent = data.name;
     const more = label.querySelector('em');
     label.setAttribute('aria-label', `Follow ${data.name}`);
@@ -304,9 +304,10 @@ export async function createWorld({ container, labels, terrain, race, onSelect, 
   });
   // Media moments: a small camera pin standing on the road where a clip was filmed.
   const pins = [];
-  function addPin({ d, label, onClick }) {
+  function addPin({ d, label, onClick, stack = 0 }) {
     const el = document.createElement('button');
     el.className = 'pin';
+    el.style.setProperty('--stack', stack);
     el.setAttribute('aria-label', label);
     el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="12.5" height="10" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3z"/></svg>';
     el.addEventListener('click', e => { e.stopPropagation(); onClick(); });

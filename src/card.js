@@ -44,7 +44,7 @@ function spaced(ctx, text, x, y, spacing) { // letter-spaced caps, as the app's 
   ctx.letterSpacing = '0px';
 }
 
-export async function drawCard(canvas, { riders, events, route, profile, stats, title, place }) {
+export async function drawCard(canvas, { riders, events, route, profile, stats, title, place, clockOffset = 0 }) {
   await Promise.all(['600', '700'].map(w => document.fonts?.load(font(w, 40)).catch(() => {})));
   canvas.width = CARD_W; canvas.height = CARD_H;
   const ctx = canvas.getContext('2d'), P = 72, W = CARD_W - 2 * P;
@@ -77,7 +77,7 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
     ctx.fillStyle = INK; ctx.font = font(700, 38);
     ctx.fillText(fit(ctx, row.rider.name.toUpperCase(), colW - 40), x + 20, base - 48);
     ctx.fillStyle = rank === 0 ? GOLD : DIM; ctx.font = font(600, 30);
-    ctx.fillText(rank === 0 ? formatClock(row.finish) : formatGap(row.gap), x + 20, base - 14);
+    ctx.fillText(rank === 0 ? formatClock(row.finish + clockOffset + 1e-6) : formatGap(row.gap), x + 20, base - 14);
   });
 
   // ---- full results
@@ -105,7 +105,7 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
     ctx.textAlign = 'left'; ctx.fillStyle = INK; ctx.font = font(600, fs);
     ctx.fillText(fit(ctx, row.rider.name.toUpperCase(), cols.time - 150 - cols.name), cols.name, base);
     ctx.textAlign = 'right';
-    ctx.fillText(formatClock(row.finish), cols.time, base);
+    ctx.fillText(formatClock(row.finish + clockOffset + 1e-6), cols.time, base);
     ctx.fillStyle = DIM;
     ctx.fillText(row.rank === 1 ? '—' : formatGap(row.gap), cols.gap, base);
     if (powerKnown) {

@@ -1,0 +1,578 @@
+{
+ "start": {
+  "epoch": 1792230512.11,
+  "utcOffset": "+0200",
+  "fit": {
+   "local": "11:48:33",
+   "epoch": 1792230513.38,
+   "lastOverLine": 10.2,
+   "clockOffset": 2.3
+  }
+ },
+ "clips": [
+  {
+   "file": "IMG_5363.MOV",
+   "duration": 3.933333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792225277,
+   "d": 6104.2,
+   "offRoad": 17305.6,
+   "altDelta": null,
+   "onClimb": false,
+   "raceT0": -5219.21,
+   "kind": "off-route",
+   "what": "Morning roll-out on the flat (10:21), about 17 km away, before the ride"
+  },
+  {
+   "file": "IMG_5364.MOV",
+   "duration": 10.2367,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792225285,
+   "d": 6104.2,
+   "offRoad": 17251.7,
+   "altDelta": null,
+   "onClimb": false,
+   "raceT0": -5211.24,
+   "kind": "off-route",
+   "what": "Roll-out on farm roads: the group strung out ahead, the filmer's shadow on the fence"
+  },
+  {
+   "file": "IMG_7771.MOV",
+   "duration": 12.165,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230434,
+   "d": 0,
+   "offRoad": 262.8,
+   "altDelta": null,
+   "onClimb": false,
+   "raceT0": -79.1,
+   "kind": "off-route",
+   "what": "Caimari village, before the start: all seven roll through between yellow houses and green shutters",
+   "group": "all",
+   "fitPasses": [
+    {
+     "rider": "rafi",
+     "at": 6,
+     "dist": 15.3
+    },
+    {
+     "rider": "el-szczupak",
+     "at": 8,
+     "dist": 13.8
+    },
+    {
+     "rider": "el-lobo",
+     "at": 11,
+     "dist": 12.8
+    },
+    {
+     "rider": "krzys",
+     "at": 11,
+     "dist": 15.1
+    },
+    {
+     "rider": "karol",
+     "at": 11,
+     "dist": 14.4
+    },
+    {
+     "rider": "el-halcon",
+     "at": 14,
+     "dist": 14.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 15,
+     "dist": 14.2
+    }
+   ]
+  },
+  {
+   "file": "IMG_7772.MOV",
+   "duration": 8.1,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230499,
+   "d": 0,
+   "offRoad": 121.8,
+   "altDelta": null,
+   "onClimb": false,
+   "raceT0": -14.32,
+   "kind": "off-route",
+   "what": "Leaving Caimari: the crossed-out town sign, the climb begins",
+   "fitPasses": [
+    {
+     "rider": "el-lobo",
+     "at": -5,
+     "dist": 33.1
+    },
+    {
+     "rider": "los-locos",
+     "at": -5,
+     "dist": 21
+    },
+    {
+     "rider": "krzys",
+     "at": -5,
+     "dist": 34.7
+    },
+    {
+     "rider": "el-halcon",
+     "at": -5,
+     "dist": 27.5
+    },
+    {
+     "rider": "karol",
+     "at": -5,
+     "dist": 30.3
+    }
+   ]
+  },
+  {
+   "file": "IMG_7774.MOV",
+   "duration": 16.603333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792230712,
+   "d": 898.4,
+   "offRoad": 4.9,
+   "altDelta": 8.1,
+   "onClimb": true,
+   "raceT0": 197.73,
+   "kind": "riding",
+   "what": "The gorge: the whole bunch on a hairpin under rock walls, El Halcon in front with Los Locos",
+   "sightings": [
+    {
+     "rider": "el-halcon",
+     "at": 1.4,
+     "offsetFromStart": -0.9,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 0,
+     "dist": 21.5
+    },
+    {
+     "rider": "los-locos",
+     "at": 4,
+     "dist": 7.9
+    },
+    {
+     "rider": "el-halcon",
+     "at": 4,
+     "dist": 6.1
+    },
+    {
+     "rider": "krzys",
+     "at": 20,
+     "dist": 7.5
+    },
+    {
+     "rider": "el-lobo",
+     "at": 21,
+     "dist": 35.6
+    },
+    {
+     "rider": "rafi",
+     "at": 21,
+     "dist": 23.5
+    },
+    {
+     "rider": "karol",
+     "at": 21,
+     "dist": 26.3
+    }
+   ]
+  },
+  {
+   "file": "IMG_7778.MOV",
+   "duration": 9.0317,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231109,
+   "d": 2692.5,
+   "offRoad": 0.7,
+   "altDelta": -2.8,
+   "onClimb": true,
+   "raceT0": 594.59,
+   "kind": "riding",
+   "what": "Roadside under olive trees: the front three (Los Locos, El Halcon, El Szczupak) come up the road; El Szczupak passes close",
+   "sightings": [
+    {
+     "rider": "el-szczupak",
+     "at": 5.6,
+     "offsetFromStart": 0.3,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 7,
+     "dist": 2.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 14,
+     "dist": 6.6
+    },
+    {
+     "rider": "el-halcon",
+     "at": 14,
+     "dist": 6.1
+    }
+   ]
+  },
+  {
+   "file": "IMG_7782.MOV",
+   "duration": 22.25,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231469,
+   "d": 4324.5,
+   "offRoad": 3.2,
+   "altDelta": 1.7,
+   "onClimb": true,
+   "raceT0": 952.51,
+   "kind": "riding",
+   "what": "The stone-wall balcony: the front three, Los Locos in front of El Halcon, mountains and big clouds behind",
+   "group": [
+    "los-locos",
+    "el-halcon",
+    "el-szczupak"
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": -1,
+     "dist": 4.9
+    },
+    {
+     "rider": "los-locos",
+     "at": 7,
+     "dist": 4.8
+    },
+    {
+     "rider": "el-halcon",
+     "at": 7,
+     "dist": 3.4
+    }
+   ]
+  },
+  {
+   "file": "IMG_7786.MOV",
+   "duration": 6.9,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231826,
+   "d": 6481,
+   "dPhone": 6361.6,
+   "offRoad": 16.5,
+   "altDelta": 11.3,
+   "onClimb": true,
+   "raceT0": 1306.53,
+   "kind": "riding",
+   "what": "On El Halcon's wheel, close, after his attack",
+   "sightings": [
+    {
+     "rider": "el-halcon",
+     "at": 1,
+     "offsetFromStart": 31.4,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "los-locos",
+     "at": -5,
+     "dist": 22.4
+    },
+    {
+     "rider": "el-szczupak",
+     "at": -5,
+     "dist": 15.9
+    },
+    {
+     "rider": "el-halcon",
+     "at": 11,
+     "dist": 37
+    }
+   ]
+  },
+  {
+   "file": "IMG_7787.MOV",
+   "duration": 18.266667,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792231850,
+   "d": 6656.2,
+   "offRoad": 1,
+   "altDelta": -4.9,
+   "onClimb": true,
+   "raceT0": 1330.34,
+   "kind": "riding",
+   "what": "Roadside: El Halcon clear in front, passes in profile; Los Locos 12 m back",
+   "group": [
+    "el-halcon",
+    "los-locos"
+   ],
+   "sightings": [
+    {
+     "rider": "el-halcon",
+     "at": 17,
+     "offsetFromStart": 12.5,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-halcon",
+     "at": 12,
+     "dist": 0.8
+    },
+    {
+     "rider": "los-locos",
+     "at": 23,
+     "dist": 32.7
+    }
+   ]
+  },
+  {
+   "file": "IMG_7789.MOV",
+   "duration": 14.035,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232043,
+   "d": 7586.4,
+   "offRoad": 0.8,
+   "altDelta": 0.3,
+   "onClimb": true,
+   "raceT0": 1522.5,
+   "kind": "riding",
+   "what": "Roadside under pines: El Halcon alone, Los Locos chasing, a car behind the riders",
+   "sightings": [
+    {
+     "rider": "el-halcon",
+     "at": 3.7,
+     "offsetFromStart": -5.2,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-halcon",
+     "at": 17,
+     "dist": 4.6
+    }
+   ]
+  },
+  {
+   "file": "IMG_7792.MOV",
+   "duration": 7.3,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232177,
+   "d": 7900.9,
+   "offRoad": 16.4,
+   "altDelta": -1.2,
+   "onClimb": true,
+   "raceT0": 1660.75,
+   "kind": "summit",
+   "what": "The last hairpin below the col: El Szczupak rises out of it, passes, rides to the top",
+   "sightings": [
+    {
+     "rider": "el-szczupak",
+     "at": 3,
+     "offsetFromStart": -12.5,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-szczupak",
+     "at": 12,
+     "dist": 16.9
+    }
+   ]
+  },
+  {
+   "file": "IMG_7793.MOV",
+   "duration": 22.438333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232308,
+   "d": 7858.8,
+   "offRoad": 0.4,
+   "altDelta": -1,
+   "onClimb": true,
+   "raceT0": 1789.14,
+   "kind": "summit",
+   "what": "The last hairpin: a passer-by waves, then Krzys climbs out of the bend and passes with a grin",
+   "sightings": [
+    {
+     "rider": "krzys",
+     "at": 17.3,
+     "offsetFromStart": 2.1,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "krzys",
+     "at": 22,
+     "dist": 0.3
+    }
+   ]
+  },
+  {
+   "file": "IMG_7794.MOV",
+   "duration": 18.273333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232374,
+   "d": 7847.7,
+   "offRoad": 1.1,
+   "altDelta": -0.2,
+   "onClimb": true,
+   "raceT0": 1854.51,
+   "kind": "summit",
+   "what": "The last hairpin: El Lobo crosses it, passes, a whip pan, the COLL DE SA BATALLA 576 m sign. He lost a bet to Krzys (penalty: the horn, 'Klakson')",
+   "sightings": [
+    {
+     "rider": "el-lobo",
+     "at": 10.8,
+     "offsetFromStart": -0.3,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "el-lobo",
+     "at": 18,
+     "dist": 2.9
+    }
+   ]
+  },
+  {
+   "file": "IMG_7795.MOV",
+   "duration": 6.868333,
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.97002997002997,
+   "hdr": true,
+   "audio": true,
+   "utcOffset": "+0200",
+   "epoch": 1792232484,
+   "d": 7847.7,
+   "offRoad": 1.1,
+   "altDelta": 5.1,
+   "onClimb": true,
+   "raceT0": 1967.52,
+   "kind": "summit",
+   "what": "The last two: Karol, then Rafi two seconds behind, to the summit sign",
+   "sightings": [
+    {
+     "rider": "karol",
+     "at": 0.8,
+     "offsetFromStart": 2.1,
+     "fit": true
+    },
+    {
+     "rider": "rafi",
+     "at": 3,
+     "offsetFromStart": -0.7,
+     "fit": true
+    }
+   ],
+   "fitPasses": [
+    {
+     "rider": "rafi",
+     "at": 5,
+     "dist": 2.5
+    },
+    {
+     "rider": "karol",
+     "at": 6,
+     "dist": 3.8
+    }
+   ]
+  },
+  {
+   "file": "VMGY3907.MP4",
+   "duration": 3.314807,
+   "width": 1080,
+   "height": 1920,
+   "fps": 30,
+   "hdr": false,
+   "audio": true,
+   "utcOffset": null,
+   "epoch": 1792235056,
+   "d": null,
+   "offRoad": null,
+   "altDelta": null,
+   "onClimb": false,
+   "raceT0": 4527.76,
+   "kind": "off-route",
+   "what": "El Lobo's selfie at the summit cafĂ© after the climb",
+   "rider": "el-lobo"
+  }
+ ]
+}

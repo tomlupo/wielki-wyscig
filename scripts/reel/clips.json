@@ -1,0 +1,18 @@
+{
+  "_": "Editor's log of the phone footage (data/videos), from contact sheets of every clip, with who is in it as Tom confirmed it (rider check, 18.10). `use`: usable [in, out] seconds. `sightings`: a rider at clip second `at` (passing the camera, or followed by it). sync.py takes the race clock from the riders' FIT rides (tracks.py) and the exact second from here. Helmets: El Halcon orange, Los Locos white, El Szczupak blue, Krzys grey, El Lobo red, Karol grey, Rafi white.",
+  "IMG_5363.MOV": { "what": "Morning roll-out on the flat (10:21), about 17 km away, before the ride", "use": [[0.4, 3.6]] },
+  "IMG_5364.MOV": { "what": "Roll-out on farm roads: the group strung out ahead, the filmer's shadow on the fence", "use": [[0.0, 3.6], [6.8, 10.0]] },
+  "IMG_7771.MOV": { "what": "Caimari village, before the start: all seven roll through between yellow houses and green shutters", "use": [[1.5, 6.5], [8.0, 12.0]], "group": "all" },
+  "IMG_7772.MOV": { "what": "Leaving Caimari: the crossed-out town sign, the climb begins", "use": [[0.0, 3.2], [3.2, 7.5]] },
+  "IMG_7774.MOV": { "what": "The gorge: the whole bunch on a hairpin under rock walls, El Halcon in front with Los Locos", "use": [[0.0, 4.5], [8.0, 10.5], [13.0, 16.4]], "sightings": [{ "at": 1.4, "rider": "el-halcon" }] },
+  "IMG_7778.MOV": { "what": "Roadside under olive trees: the front three (Los Locos, El Halcon, El Szczupak) come up the road; El Szczupak passes close", "use": [[1.5, 7.6]], "sightings": [{ "at": 5.6, "rider": "el-szczupak" }] },
+  "IMG_7782.MOV": { "what": "The stone-wall balcony: the front three, Los Locos in front of El Halcon, mountains and big clouds behind", "use": [[0.0, 7.5], [8.0, 16.0], [16.0, 21.8]], "group": ["los-locos", "el-halcon", "el-szczupak"] },
+  "IMG_7786.MOV": { "what": "On El Halcon's wheel, close, after his attack", "use": [[0.0, 6.6]], "sightings": [{ "at": 1.0, "rider": "el-halcon" }] },
+  "IMG_7787.MOV": { "what": "Roadside: El Halcon clear in front, passes in profile; Los Locos 12 m back", "use": [[6.0, 18.0]], "sightings": [{ "at": 17.0, "rider": "el-halcon" }], "group": ["el-halcon", "los-locos"] },
+  "IMG_7789.MOV": { "what": "Roadside under pines: El Halcon alone, Los Locos chasing, a car behind the riders", "use": [[0.0, 4.0], [5.5, 10.5]], "sightings": [{ "at": 3.7, "rider": "el-halcon" }] },
+  "IMG_7792.MOV": { "what": "The last hairpin below the col: El Szczupak rises out of it, passes, rides to the top", "use": [[0.5, 6.8]], "sightings": [{ "at": 3.0, "rider": "el-szczupak" }] },
+  "IMG_7793.MOV": { "what": "The last hairpin: a passer-by waves, then Krzys climbs out of the bend and passes with a grin", "use": [[0.0, 1.6], [12.0, 21.5]], "sightings": [{ "at": 17.3, "rider": "krzys" }] },
+  "IMG_7794.MOV": { "what": "The last hairpin: El Lobo crosses it, passes, a whip pan, the COLL DE SA BATALLA 576 m sign. He lost a bet to Krzys (penalty: the horn, 'Klakson')", "use": [[6.0, 18.0]], "sightings": [{ "at": 10.8, "rider": "el-lobo" }] },
+  "IMG_7795.MOV": { "what": "The last two: Karol, then Rafi two seconds behind, to the summit sign", "use": [[0.0, 6.6]], "sightings": [{ "at": 0.8, "rider": "karol" }, { "at": 3.0, "rider": "rafi" }] },
+  "VMGY3907.MP4": { "what": "El Lobo's selfie at the summit café after the climb", "use": [[0.0, 3.3]], "rider": "el-lobo" }
+}

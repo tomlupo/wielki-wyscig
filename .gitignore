@@ -5,3 +5,6 @@ dist/
 !.env.example
 data/videos/
 .cache/
+# Highlight reel: the music and the renders stay local (scripts/reel)
+data/music/
+out/

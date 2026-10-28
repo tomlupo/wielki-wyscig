@@ -1,7 +1,7 @@
 // Shareable view state in the URL query: ?t=1080&r=rider-b&cam=follow&x=30 (cam=auto: the TV director)
 export const CAMERAS = ['follow', 'pov', 'overview', 'free']; // order of the camera buttons and keys 1–4
 export const SPEEDS = [1, 5, 10, 30, 60];
-export const DEFAULTS = { t: 0, rider: null, cam: 'follow', speed: 10 };
+const DEFAULTS = { t: 0, rider: null, cam: 'follow', speed: 10 };
 
 export function parseState(search, { riderIds, duration }) {
   const q = new URLSearchParams(search), state = { ...DEFAULTS, shared: false };

@@ -14,7 +14,7 @@ export const FORMATS = { '9x16': [1080, 1920], '16x9': [1920, 1080] };
 const DATA_CUES = new Set(['stat', 'trace', 'duel', 'rider', 'standings', 'profile', 'finisher', 'event']);
 
 export function loadInputs() {
-  const race = JSON.parse(readFileSync(`${ROOT}/data/race.json`, 'utf8'));
+  const race = JSON.parse(readFileSync(`${ROOT}/public/race.json`, 'utf8'));
   const terrain = JSON.parse(readFileSync(`${ROOT}/public/terrain.json`, 'utf8'));
   const model = buildModel(race, terrain.route);
   const sync = JSON.parse(readFileSync(`${WORK}/sync.json`, 'utf8'));

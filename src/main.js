@@ -1,8 +1,7 @@
 import './style.css';
-import { interpolate, timeAtDistance, telemetryAt, standings, formatClock, formatGap } from './race.js';
+import { interpolate, timeAtDistance, telemetryAt, standings, formatClock, formatGap, loadRace } from './race.js';
 import { elevationProfile, climbStats, gradeAt, gradeColor } from './profile.js';
 import { parseState, serializeState, SPEEDS, CAMERAS } from './state.js';
-import { loadRace } from './data/source.js';
 import { renderProfile, createCharts } from './charts.js';
 import { deriveEvents } from './events.js';
 import { createDirector } from './director.js';

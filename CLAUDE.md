@@ -12,7 +12,7 @@ Vite + three.js 0.160 + d3, plain ES modules; Python build scripts run with `uv 
 
 | What | Where |
 |---|---|
-| Race data (v1 contract) | `data/race.json`, built by `scripts/fit_to_race.py` from `rides/*.fit` (tracked on purpose) |
+| Race data (v1 contract) | `public/race.json` (served at `/race.json`), built by `scripts/fit_to_race.py` from `rides/*.fit` (tracked on purpose) |
 | Ground | `public/terrain.json` + `public/corridor/`, built by `scripts/build_terrain.py` |
 | Clips | `data/media.json` + `public/media/*.mp4/.jpg`; raw phone videos in `data/videos/` (git-ignored) |
 | App | `src/main.js` (HUD, sheet, clips), `src/world.js` (scene, cameras), `src/terrain.js`, `src/corridor.js`, `src/trees.js`, `src/roadside.js`, `src/atmosphere.js`, `src/director.js` (TV camera), `src/events.js`, `src/card.js` |

@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["fitparse>=1.2", "pyproj>=3.6", "numpy>=1.26"]
 # ///
-"""Build data/race.json from recorded rides (FIT or GPX), one file per rider.
+"""Build public/race.json from recorded rides (FIT or GPX), one file per rider.
 
     uv run scripts/fit_to_race.py "El Lobo=rides/lobo.fit" "Krzysiek=rides/krzys.gpx:#4fc3f7"
 
@@ -55,7 +55,7 @@ from pyproj import Transformer
 
 ROOT = Path(__file__).resolve().parent.parent
 TERRAIN = ROOT / "public" / "terrain.json"
-OUT = ROOT / "data" / "race.json"
+OUT = ROOT / "public" / "race.json"
 STEP_S = 5
 NEAR_M = 25.0  # a point closer than this to the road counts as "on the climb"
 END_M = 25.0  # within this of the summit vertex = arrived

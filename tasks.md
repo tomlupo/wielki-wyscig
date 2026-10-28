@@ -7,8 +7,8 @@ through the PR chain (see CLAUDE.md).
 
 Give the 3D riders what they wore, so a phone clip and the replay look like the same race.
 
-- Add an optional per-rider `kit` to `data/race.json`: `{ helmet, jersey, accent, pattern, shorts, bike }`.
-  Validate it in `src/data/source.js`. It must stay backwards-compatible: a rider without `kit`
+- Add an optional per-rider `kit` to `public/race.json`: `{ helmet, jersey, accent, pattern, shorts, bike }`.
+  Validate it in `validateRace` (`src/race.js`). It must stay backwards-compatible: a rider without `kit`
   looks as now.
 - Helmets are already the rider colour (`color`, PR #9). The kit adds the rest:
   - Jersey: the Icarus team kit for everyone who wore it (dark green, gold/yellow trim in the
@@ -44,7 +44,7 @@ and power awards are off (weights aren't reliable).
   - **Klakson:** a horn honk and a 📯 lower third when El Lobo's clip (`el-lobo`, IMG_7794) plays,
     or when Krzys passes him if the events contain that pass. After that, a small horn on El Lobo's
     handlebar to the finish.
-- Unit-test every rule against `data/race.json`: the table above is the expected output.
+- Unit-test every rule against `public/race.json`: the table above is the expected output.
 
 ## Making the next route easier
 

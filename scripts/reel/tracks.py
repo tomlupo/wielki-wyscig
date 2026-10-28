@@ -46,7 +46,7 @@ def main() -> None:
     args = ap.parse_args()
 
     terrain = json.loads((ROOT / "public" / "terrain.json").read_text())
-    race = json.loads((ROOT / "data" / "race.json").read_text())
+    race = json.loads((ROOT / "public" / "race.json").read_text())
     route = np.asarray(terrain["route"], float)
     out = {"riders": {}}
     for r in race["riders"]:

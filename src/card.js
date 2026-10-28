@@ -3,12 +3,12 @@
 import { interpolate, timeAtDistance, standings, formatClock, formatGap } from './race.js';
 import { gradeColor } from './profile.js';
 
-export const CARD_W = 1080, CARD_H = 1350;
+const CARD_W = 1080, CARD_H = 1350;
 const INK = '#f4f2ea', DIM = '#a9b2a7', FAINT = '#6f786e', GOLD = '#ffd34d', LINE = 'rgba(255,255,255,0.12)';
 const FONT = '"Barlow Condensed", "Arial Narrow", system-ui, sans-serif';
 
 // Time-weighted mean power over the ride; null when the rider has no power data.
-export function averageWatts(samples) {
+function averageWatts(samples) {
   let sum = 0, span = 0;
   for (let k = 1; k < samples.length; k++) {
     const a = samples[k - 1], b = samples[k];
@@ -20,11 +20,11 @@ export function averageWatts(samples) {
 }
 
 // Everything the card says, as data: results rows and the moves (passes and lead changes).
-export function cardData(riders, events) {
+function cardData(riders, events) {
   const duration = Math.max(...riders.map(r => r.samples.at(-1).t));
   const rows = standings(riders, duration).map(row => {
-    const r = riders[row.index], watts = averageWatts(r.samples), kg = r.kg ?? r.weightKg ?? null;
-    return { ...row, rider: r, watts, wkg: watts != null && kg > 0 ? watts / kg : null };
+    const r = riders[row.index];
+    return { ...row, rider: r, watts: averageWatts(r.samples) };
   });
   const moves = events.filter(e => e.type === 'lead' || e.type === 'pass')
     .sort((a, b) => b.score - a.score).slice(0, 3).sort((a, b) => a.t - b.t)
@@ -82,14 +82,14 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
 
   // ---- full results
   let y = 552;
-  const powerKnown = rows.some(r => r.watts != null), wkgKnown = rows.some(r => r.wkg != null);
+  const powerKnown = rows.some(r => r.watts != null);
   const cols = { rank: P, name: P + 92, time: P + W - (powerKnown ? 360 : 150), gap: P + W - (powerKnown ? 200 : 0), power: P + W };
   ctx.fillStyle = FAINT; ctx.font = font(600, 22);
   spaced(ctx, 'RIDER', cols.name, y, 4);
   ctx.textAlign = 'right';
   spaced(ctx, 'TIME', cols.time, y, 4);
   spaced(ctx, 'GAP', cols.gap, y, 4);
-  if (powerKnown) spaced(ctx, wkgKnown ? 'AVG W · W/KG' : 'AVG W', cols.power, y, 4);
+  if (powerKnown) spaced(ctx, 'AVG W', cols.power, y, 4);
   ctx.textAlign = 'left';
   const rowH = Math.min(48, 260 / rows.length), fs = Math.round(rowH * 0.62);
   y += 14;
@@ -110,7 +110,7 @@ export async function drawCard(canvas, { riders, events, route, profile, stats, 
     ctx.fillText(row.rank === 1 ? '—' : formatGap(row.gap), cols.gap, base);
     if (powerKnown) {
       ctx.fillStyle = INK;
-      ctx.fillText(row.watts == null ? '—' : `${Math.round(row.watts)} W${row.wkg != null ? ` · ${row.wkg.toFixed(1)}` : ''}`, cols.power, base);
+      ctx.fillText(row.watts == null ? '—' : `${Math.round(row.watts)} W`, cols.power, base);
     }
     ctx.textAlign = 'left';
     y += rowH;

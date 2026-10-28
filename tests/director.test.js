@@ -6,7 +6,7 @@ import { createDirector } from '../src/director.js';
 import { standings } from '../src/race.js';
 
 // The real race, played through at each replay speed in 60 fps frames.
-const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+const race = JSON.parse(readFileSync(new URL('../public/race.json', import.meta.url)));
 const riders = race.riders, duration = Math.max(...riders.map(r => r.samples.at(-1).t));
 const targets = deriveEvents(riders);
 

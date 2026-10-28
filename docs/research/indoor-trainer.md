@@ -4,7 +4,7 @@ Status: research only, nothing built. Date: 2026-10-18. Target: PC, Chrome/Edge.
 
 ## Goal
 
-Ride live on a smart trainer against the recorded riders in `data/race.json` as ghosts, Zwift style: pedal, the avatar moves, climbs get harder.
+Ride live on a smart trainer against the recorded riders in `public/race.json` as ghosts, Zwift style: pedal, the avatar moves, climbs get harder.
 
 Today the game only replays recorded samples (`{ t, speed, watts, hr }` in `src/race.js`). A live rider produces the same shape, so the race model mostly stays.
 

@@ -8,3 +8,4 @@ data/videos/
 # Highlight reel: the music and the renders stay local (scripts/reel)
 data/music/
 out/
+__pycache__/

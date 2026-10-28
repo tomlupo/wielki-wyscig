@@ -68,8 +68,8 @@ test('the list is capped, keeps the finish, and reads in time order', () => {
   for (let k = 1; k < capped.length; k++) assert.ok(capped[k - 1].t <= capped[k].t);
 });
 
-test('the real race (data/race.json) gives a short, ordered list ending with every rider at the top', () => {
-  const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+test('the real race (public/race.json) gives a short, ordered list ending with every rider at the top', () => {
+  const race = JSON.parse(readFileSync(new URL('../public/race.json', import.meta.url)));
   const events = deriveEvents(race.riders);
   assert.ok(events.length >= 8 && events.length <= 15, `got ${events.length}`);
   for (let k = 1; k < events.length; k++) assert.ok(events[k - 1].t <= events[k].t);

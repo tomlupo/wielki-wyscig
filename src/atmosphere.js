@@ -13,7 +13,7 @@ export const FAR_ALBEDO = new THREE.Color(0.078, 0.08, 0.058); // linear: averag
 const FOG_DENSITY = 1.7e-4, FOG_FALLOFF = 0.0011, FOG_BASE = 200; // per m; per m of height; reference height (m)
 
 const f = v => v.toFixed(5);
-export const SKY_GLSL = `
+const SKY_GLSL = `
 const vec3 SUN_DIR = vec3(${f(SUN_DIR.x)}, ${f(SUN_DIR.y)}, ${f(SUN_DIR.z)});
 vec3 skyColor(vec3 d) {
   float y = clamp(d.y, 0.0, 1.0), mu = max(dot(d, SUN_DIR), 0.0);

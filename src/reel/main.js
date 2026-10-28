@@ -5,7 +5,7 @@
 // (pre-extracted by ffmpeg), transitions, and the broadcast graphics. Time never comes from
 // the wall clock: frame f is race time plan.raceT[f], camera time f / fps.
 import { clock } from './clock.js';
-import { loadRace } from '../data/source.js';
+import { loadRace } from '../race.js';
 import { createWorld } from '../world.js';
 import { buildModel } from './model.js';
 import { createCameras } from './camera.js';

@@ -1,8 +1,8 @@
 # Race data and backend integration
 
-The production frontend loads `GET /api/race`. The Vercel function reads `data/race.json`. No upload UI or unauthenticated write endpoint is included.
+The frontend loads `GET /race.json`, the static file `public/race.json` (Vercel caches it at the edge for 60 s). No upload UI or write endpoint is included.
 
-For now, replace `data/race.json` through GitHub/backend tooling and push to `main` to publish a new dataset. Later the API can read an object store or database without changing the renderer.
+To publish a new dataset, rebuild `public/race.json` (see Real rides below) and push to `main`.
 
 ## Version 1 contract
 
@@ -41,23 +41,11 @@ The reference road is `public/terrain.json` → `route`, whose entries are `[eas
 
 Private repository visibility does not itself protect a deployed app. Existing Vercel Deployment Protection remains in place. Review access deliberately before adding personal activity data.
 
-## Data sources (the one seam)
+## Data sources
 
-`src/data/source.js` is the only place the app learns where race data comes from. A **RaceSource** is `{ load(): Promise<RaceV1> }`. `loadRace(source)` validates the result against the contract above. Everything after that point (the race model, the 3D world, the HUD, the URL state) only sees version-1 data.
+`loadRace()` in `src/race.js` fetches `/race.json`, checks it against the contract above (`validateRace`) and hands version-1 data to the rest (the race model, the 3D world, the HUD, the URL state, the reel). There is one source: `scripts/fit_to_race.py` turns recorded FIT or GPX rides into `public/race.json` offline (see Real rides below), in the terrain frame: the `bounds` are Web Mercator metres (EPSG:3857), and `route` x/z are east/south metres from the bounds centre, scaled by cos(latitude of the centre), so they are true metres.
 
-- **Today:** `simulatedSource()` → `GET /api/race` → `data/race.json` (recorded rides, or synthetic riders when `simulated` is true).
-- **GPX / FIT files:** write `gpxSource(files)` that returns a RaceV1. For each rider:
-  1. Parse the track points.
-  2. Project lat/lon into the terrain frame.
-  3. Map-match each point to the nearest `route` vertex to get `d`.
-  4. Trim to the segment, so that `d` runs from 0 to `distanceM`.
-  5. Rebase `t` to 0 at the segment start.
-  6. Keep `watts` and `hr` from the extensions. Use `null` when they are absent.
-
-  The terrain `bounds` are Web Mercator metres (EPSG:3857). `route` x/z are east/south metres from the bounds centre, scaled by cos(latitude of the centre), so they are true metres. `scripts/fit_to_race.py` and `scripts/build_terrain.py` both use this.
-- **Live per-rider feed:** write a source whose `load()` returns the current snapshot. To get updates, add `subscribe(onRace)`, and rebuild the race model on each update. Live riders have not reached the summit yet, so `validateRace` needs a `live` flag that relaxes the "ends at `distanceM`" rule. This flag does not exist yet.
-
-Swap the source in one line in `src/main.js` (`loadRace()` → `loadRace(gpxSource(...))`).
+A live per-rider feed would need its own loader, and a `live` flag on `validateRace` that relaxes the "ends at `distanceM`" rule. Neither exists.
 
 ## Rider colours
 
@@ -70,7 +58,7 @@ A rider's `color` is their helmet colour: it marks them everywhere (labels, stan
 ## Development
 
 `npm ci`, `npm test`, `npm run dev`, `npm run build`.
-Vite's development middleware serves the same `/api/race` contract. Production uses `api/race.js`.
+Vite serves `public/race.json` at `/race.json` in development and preview, and copies it to `dist/` for production.
 
 ## Data attribution
 
@@ -79,7 +67,7 @@ Vite's development middleware serves the same `/api/race` contract. Production u
 - Road corridor imagery: © IGN / PNOA 25 cm, CC BY 4.0, same WMS as above, in `public/corridor/`.
 - Trees: detected from that imagery (dark green crowns), so they stand where real trees do; species and height are estimated.
 - Road: https://mallorcavelo.com/gpx/serra-de-tramuntana-nord.gpx ; OpenStreetMap contributors, ODbL. Extract reversed to climb Caimari → summit.
-- `data/race.json` holds recorded rides (`"simulated": false`). When a dataset is marked simulated, its rider metrics are synthetic and are not physiological or performance estimates for real people.
+- `public/race.json` holds recorded rides (`"simulated": false`). When a dataset is marked simulated, its rider metrics are synthetic and are not physiological or performance estimates for real people.
 
 Aerial imagery is draped over a finite ~6 × 9 km terrain mesh. This is not street-level photogrammetry. Vertical scale is 1:1. Riders are drawn 3× life size; the road (6 m), walls and trees are real size. Walls and guardrails are placed where the ground falls away beside the road, not from a survey.
 
@@ -95,7 +83,7 @@ The survey-wide aerial texture in `terrain.json` (~4.75 m/px) is unchanged; the 
 
 ## Real rides: `scripts/fit_to_race.py`
 
-`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `data/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). The raw rides are kept in the repository under `rides/` (one FIT file per rider, ~5 MB for 17.10), so `data/race.json` can be rebuilt and re-checked at any time. They are whole rides with personal data (home location, weight, heart-rate zones): the site never serves them (they are outside `public/`), and only the trimmed climb in `data/race.json` is published.
+`uv run scripts/fit_to_race.py --mass-start "El Lobo=rides/el-lobo.fit:#ffd34d@31:34" "Name=rides/x.gpx:#4fc3f7"` rebuilds `public/race.json` from FIT or GPX files (whole rides are fine). `@MM:SS` is the rider's official segment time. It finds the climb by matching GPS to `route`, cuts at the first arrival at the summit (a café stop at the top does not count), times the start and summit crossings between GPS points, and puts everyone on one clock (see Clock). The raw rides are kept in the repository under `rides/` (one FIT file per rider, ~5 MB for 17.10), so `public/race.json` can be rebuilt and re-checked at any time. They are whole rides with personal data (home location, weight, heart-rate zones): the site never serves them (they are outside `public/`), and only the trimmed climb in `public/race.json` is published.
 
 17.10 was built with:
 

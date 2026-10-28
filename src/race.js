@@ -18,6 +18,12 @@ export function validateRace(race) {
   }
   return race;
 }
+// The race: public/race.json (built by scripts/fit_to_race.py), checked against the v1 contract.
+export async function loadRace() {
+  const response = await fetch('/race.json');
+  if (!response.ok) throw new Error(`Race data unavailable (${response.status}).`);
+  return validateRace(await response.json());
+}
 function bracket(samples, value, key) {
   let lo = 0, hi = samples.length - 1;
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (samples[mid][key] < value) lo = mid; else hi = mid; }

@@ -1,7 +1,7 @@
 // Elevation profile of the reference road. `route` rows are
 // [eastM, southM, altitudeM, cumulativeDistanceM] (see DATA.md).
 
-export function altitudeAt(route, d) {
+function altitudeAt(route, d) {
   const len = route.at(-1)[3];
   d = Math.max(0, Math.min(len, d));
   let lo = 0, hi = route.length - 1;

@@ -6,7 +6,7 @@ import { mapFrames, speedAt } from '../scripts/reel/timing.mjs';
 import { makePlan } from '../scripts/reel/plan.mjs';
 
 // The highlight reel's planner, on the real race and a footage-free copy of the clip sync.
-const race = JSON.parse(readFileSync(new URL('../data/race.json', import.meta.url)));
+const race = JSON.parse(readFileSync(new URL('../public/race.json', import.meta.url)));
 const terrain = JSON.parse(readFileSync(new URL('../public/terrain.json', import.meta.url)));
 const sync = JSON.parse(readFileSync(new URL('./fixtures/reel-sync.json', import.meta.url)));
 const model = buildModel(race, terrain.route);
